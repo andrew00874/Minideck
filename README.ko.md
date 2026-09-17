@@ -2,6 +2,8 @@
 
 [English](README.md) · **한국어**
 
+**다운로드:** [한국어판 ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.1/MiniDeck-0.1.0-beta.1-win-ko.zip) · [영문판 ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.1/MiniDeck-0.1.0-beta.1-win-en.zip) · [베타 릴리스](https://github.com/andrew00874/Minideck/releases/tag/v0.1.0-beta.1)
+
 Windows 10/11과 .NET Framework 4.8 이상이 필요합니다. 한국어판(`win-ko.zip`) 또는 영문판(`win-en.zip`) 전체를 풀고 `MiniDeck.exe`를 실행하세요. 두 버전은 같은 사용자 설정을 공유하며 동시에 실행하지 않습니다. 이 배포는 서명되지 않은 베타 버전입니다.
 
 ## 웹사이트 기존 탭으로 전환

@@ -10,7 +10,7 @@ Turn to choose an app. Press to open it. Drag the dial anywhere and it remembers
 
 ## Download and run
 
-Choose the English (`win-en.zip`) or Korean (`win-ko.zip`) package from Releases. Extract the entire ZIP and run `MiniDeck.exe`. Keep the DLL files and `fonts` folder beside the executable.
+Download the [English ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.1/MiniDeck-0.1.0-beta.1-win-en.zip) or [Korean ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.1/MiniDeck-0.1.0-beta.1-win-ko.zip) from the [beta release](https://github.com/andrew00874/Minideck/releases/tag/v0.1.0-beta.1). Extract the entire ZIP and run `MiniDeck.exe`. Keep the DLL files and `fonts` folder beside the executable.
 
 Requires Windows 10/11 and .NET Framework 4.8 or newer. No administrator access is required for normal use. The build is unsigned.
 

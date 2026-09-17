@@ -24,9 +24,31 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Browser tests failed' }
       - name: Build Korean and English packages
         shell: pwsh
-        run: ./scripts/package.ps1
+        run: |
+          $version = '0.1.0-beta.1'
+          if ($env:GITHUB_REF_TYPE -eq 'tag') { $version = $env:GITHUB_REF_NAME.Substring(1) }
+          ./scripts/package.ps1 -Version $version
       - uses: actions/upload-artifact@v4
         with:
           name: MiniDeck-windows-ko-en
           path: dist/*
           if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: MiniDeck-windows-ko-en
+          path: dist
+      - name: Publish beta release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" dist/* --verify-tag --prerelease --title "MiniDeck $RELEASE_TAG" --notes-file .github/release-notes.md
