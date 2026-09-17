@@ -1,0 +1,4 @@
+{
+ "description": {"message":"MiniDeck 다이얼에서 이미 열린 웹사이트 탭으로 전환합니다."},
+ "reconnect": {"message":"MiniDeck 브라우저 연결 다시 시도"}
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+ <defs><linearGradient id="accent" x2="1" y2="1"><stop stop-color="#b6cbff"/><stop offset="1" stop-color="#70dfc3"/></linearGradient></defs>
+ <rect x="8" y="8" width="112" height="112" rx="30" fill="#202c42"/>
+ <circle cx="64" cy="64" r="17" fill="url(#accent)"/>
+ <ellipse cx="64" cy="64" rx="43" ry="25" transform="rotate(-35 64 64)" fill="none" stroke="url(#accent)" stroke-width="6"/>
+ <circle cx="96" cy="34" r="7" fill="#eef4ff"/>
+</svg>

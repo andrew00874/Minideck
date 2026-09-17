@@ -1,0 +1,13 @@
+* text=auto
+*.cs text eol=crlf
+*.ps1 text eol=crlf
+*.md text eol=lf
+*.json text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.png binary
+*.ico binary
+*.otf binary
+# Preserve third-party notices verbatim, including upstream whitespace.
+licenses/* -whitespace
+fonts/*.txt -whitespace

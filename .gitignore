@@ -1,0 +1,23 @@
+# Build output and downloaded dependencies
+*.exe
+*.dll
+*.pdb
+*.zip
+/vendor/
+/dist/
+/artifacts/
+/test-data/
+/test-results.txt
+/diagnostic-error.txt
+/*-preview.png
+/long-title-*.png
+# Private hardware investigations and decompiled third-party code
+/diagnostics/
+# Per-machine browser registration
+/browser-extension/native-host.json
+# User configuration and logs
+settings.json
+settings.json.*
+onboard-draft.json*
+*.log
+.vs/

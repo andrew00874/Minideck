@@ -1,0 +1,8 @@
+[
+ {"id":"svg","version":"3.4.7","library":"lib/net462/Svg.dll","sha256":"59F3C5D51C302810C4AD8BCAE029DC81B0C611E2D6628EFA6B21353DC192A2B4"},
+ {"id":"excss","version":"4.2.3","library":"lib/net48/ExCSS.dll","sha256":"33F1FA3F9A7BAAA745CFF7E0008D8C301590EE778DFC6222798492C718EC33D2"},
+ {"id":"system.memory","version":"4.5.5","library":"lib/net461/System.Memory.dll","sha256":"10F43DA352A29FB2B3188E4EDD4DCF5100194C8B526E4F61FE2E2B5623775A22"},
+ {"id":"system.buffers","version":"4.5.1","library":"lib/net461/System.Buffers.dll","sha256":"C30B3DD2C7E2F4CEE4B823D692FD42118309B42AB1F5007F923D329A5B0D6B12"},
+ {"id":"system.runtime.compilerservices.unsafe","version":"4.5.3","library":"lib/net461/System.Runtime.CompilerServices.Unsafe.dll","sha256":"96764C52A44EE1161151E48EF07489F72047A851CB55B99E9F01D6908536D1A9"},
+ {"id":"system.numerics.vectors","version":"4.5.0","library":"lib/net46/System.Numerics.Vectors.dll","sha256":"A9D49320581FDA1B4F4BE6212C68C01A22CDF228026099C20A8EABEFCF90F9CF"}
+]

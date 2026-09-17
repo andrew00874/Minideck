@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "MiniDeck Browser Link",
+  "version": "1.0.0",
+  "description": "__MSG_description__",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy2JpZ3rAenF8t0Y5YFpiH2QM+1GQ0OKYfFtBhAuqqU334FfhOlSh+5L/XyIWn4+7if0vvrkDKIKWwnotWLoBrZ7YgKKhLxEeV5qPeNyaSFvB2T1e3ukVV+J9uQxmyLg6rgqIUuj8Zd5+H7MTJJAJheKd5euG667xAzZ1l7E3MLFE3B4RfXSXgBKmwWSqC4T86E7FppIdTrvxpGcEGTYXRxavqIf6XF4o6Y6bNMye10AWc6ZE5PgmmT57iMyTQovNMiomk/Ijw35R3TZCXHy08/XE/G2kj9iV1g/YVZXUjFA/samnHZdCR5JE8WjKKArSrZRjQBCdUDJJq8bROlHfnwIDAQAB",
+  "permissions": [
+    "tabs",
+    "nativeMessaging",
+    "alarms"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "__MSG_reconnect__"
+  },
+  "default_locale": "en"
+}

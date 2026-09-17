@@ -1,0 +1,32 @@
+name: Build Windows packages
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check English coverage and browser routing
+        shell: pwsh
+        run: |
+          node scripts/localization.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Translation check failed' }
+          node browser-extension/test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Browser tests failed' }
+      - name: Build Korean and English packages
+        shell: pwsh
+        run: ./scripts/package.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MiniDeck-windows-ko-en
+          path: dist/*
+          if-no-files-found: error
