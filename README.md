@@ -27,8 +27,8 @@ Keep your favorite apps, folders and websites on one dial. Turn the knob to move
 
 | Edition | Download |
 | --- | --- |
-| English | [MiniDeck 0.1.0-beta.1 — English ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.1/MiniDeck-0.1.0-beta.1-win-en.zip) |
-| 한국어 | [MiniDeck 0.1.0-beta.1 — Korean ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.1/MiniDeck-0.1.0-beta.1-win-ko.zip) |
+| English | [MiniDeck 0.1.0-beta.2 — English ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.2/MiniDeck-0.1.0-beta.2-win-en.zip) |
+| 한국어 | [MiniDeck 0.1.0-beta.2 — Korean ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.2/MiniDeck-0.1.0-beta.2-win-ko.zip) |
 
 **Requirements:** Windows 10/11, .NET Framework 4.8 or newer. Normal use does not require administrator access. This beta is unsigned.
 
@@ -112,7 +112,7 @@ Matching uses the same origin: scheme, hostname and port. For example, a saved `
 
 Different subdomains, other Chrome profiles, other browsers and incognito tabs are excluded. If the extension is disconnected, MiniDeck shows a message instead of opening a duplicate. Click the extension icon to reconnect, or allow up to 30 seconds for automatic reconnection.
 
-See [the full extension guide](browser-extension/README.md). The extension uses tab metadata and a local native-messaging connection; it does not read page contents, cookies or passwords, or send data to a remote server. It is loaded unpacked, not from the Chrome Web Store. **An actual installed-extension end-to-end test is still pending for this beta.**
+See [the full extension guide](browser-extension/README.md). The extension uses tab metadata and a local native-messaging connection; it does not read page contents, cookies or passwords, or send data to a remote server. It is loaded unpacked, not from the Chrome Web Store. **Existing-tab switching and bringing Chrome to the foreground have been confirmed on a Windows/Chrome installation. Other browser scenarios still need broader testing.**
 
 ## 5. Save mappings to a supported keyboard
 
@@ -156,7 +156,7 @@ Settings are saved in `%APPDATA%\MiniDeck\settings.json`, with the previous save
 
 Both language builds passed the app self-tests; English screens were visually reviewed. Automated checks cover settings, key assignments, global hotkeys, dial navigation/drag/size, long captions, icon import, onboard packet encoding, translation coverage, browser routing and the local native-message transport.
 
-These checks do **not** prove onboard write persistence or compatibility with every mini keyboard. Real installed Chrome-extension use, elevated apps and mixed-DPI displays need further validation. Desktop apps outside the limited reuse case follow their normal launch behavior.
+These checks do **not** prove onboard write persistence or compatibility with every mini keyboard. Existing-tab switching and foreground activation were also confirmed in Chrome on Windows. Other browser scenarios, elevated apps and mixed-DPI displays need further validation. Desktop apps outside the limited reuse case follow their normal launch behavior.
 
 ## Build from source
 
@@ -188,4 +188,4 @@ Self-tests use isolated settings. Preview mode uses sample entries; the screensh
 
 Bundled library and font notices are in [THIRD-PARTY.md](THIRD-PARTY.md), `licenses/` and `fonts/`. Original manufacturer executables and decompiled vendor code are not included. No project-wide open-source license has been selected yet; third-party components retain their own licenses.
 
-Last reviewed: 2026-09-18 · Version: 0.1.0-beta.1
+Last reviewed: 2026-09-18 · Version: 0.1.0-beta.2

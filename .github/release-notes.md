@@ -1,9 +1,15 @@
 MiniDeck is a circular Windows app launcher for a three-key macro pad with a pressable dial.
 
+### Fixed in beta.2 / 수정 사항
+
+Website selection now brings Chrome to the foreground before selecting the destination tab. Previously, the tab could change while Chrome stayed behind another app. Existing-tab switching and foreground activation were confirmed on a Windows/Chrome installation. No extension reload or reinstall is needed.
+
+웹사이트 선택 시 탭만 바뀌고 Chrome이 뒤에 남던 문제를 수정했습니다. 실제 환경에서 Chrome이 앞으로 올라오는 동작을 확인했습니다. 확장 재설치나 새로고침 없이 MiniDeck만 업데이트하면 됩니다.
+
 ### Downloads / 다운로드
 
-- **English:** `MiniDeck-0.1.0-beta.1-win-en.zip`
-- **한국어:** `MiniDeck-0.1.0-beta.1-win-ko.zip`
+- **English:** `MiniDeck-0.1.0-beta.2-win-en.zip`
+- **한국어:** `MiniDeck-0.1.0-beta.2-win-ko.zip`
 - `SHA256SUMS.txt` contains the checksums for both ZIP files.
 
 Extract the entire archive and run **MiniDeck.exe**. Keep the DLLs and `fonts` folder together. Requires Windows 10/11 and .NET Framework 4.8+. Both language editions share settings; run one at a time.
@@ -22,6 +28,6 @@ Extract the entire archive and run **MiniDeck.exe**. Keep the DLLs and `fonts` f
 
 Both language builds passed the app self-tests. English UI previews were reviewed. Browser routing and local native-message transport tests passed. A clean source checkout was built successfully.
 
-The actual installed Chrome extension and onboard write persistence still need end-to-end validation. Global shortcuts currently respond to any keyboard. Similar-looking macro pads may use different hardware/protocols. Builds are unsigned.
+Existing-tab switching and foreground activation were confirmed in Chrome on Windows. Broader browser scenarios and onboard write persistence need further validation. Global shortcuts currently respond to any keyboard. Similar-looking macro pads may use different hardware/protocols. Builds are unsigned.
 
 Personal settings, original manufacturer software and hardware investigation files are excluded.

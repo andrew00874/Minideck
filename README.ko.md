@@ -27,8 +27,8 @@
 
 | 언어 | 다운로드 |
 | --- | --- |
-| 한국어 | [MiniDeck 0.1.0-beta.1 — 한국어판 ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.1/MiniDeck-0.1.0-beta.1-win-ko.zip) |
-| English | [MiniDeck 0.1.0-beta.1 — 영문판 ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.1/MiniDeck-0.1.0-beta.1-win-en.zip) |
+| 한국어 | [MiniDeck 0.1.0-beta.2 — 한국어판 ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.2/MiniDeck-0.1.0-beta.2-win-ko.zip) |
+| English | [MiniDeck 0.1.0-beta.2 — 영문판 ZIP](https://github.com/andrew00874/Minideck/releases/download/v0.1.0-beta.2/MiniDeck-0.1.0-beta.2-win-en.zip) |
 
 **실행 환경:** Windows 10/11, .NET Framework 4.8 이상. 일반 사용에는 관리자 권한이 필요하지 않습니다. 현재 배포는 서명되지 않은 베타 버전입니다.
 
@@ -112,7 +112,7 @@
 
 서브도메인이 다르거나 다른 Chrome 프로필·다른 브라우저·시크릿 탭이면 검색 대상에서 제외됩니다. 확장이 연결되지 않았을 때는 중복 탭을 대신 열지 않고 안내를 표시합니다. 확장 아이콘을 눌러 다시 연결하거나 최대 30초의 자동 재연결을 기다리세요.
 
-자세한 내용은 [확장 설치 안내](browser-extension/README.ko.md)를 참고하세요. 탭 정보와 로컬 연결을 사용하며 페이지 본문·쿠키·비밀번호를 읽거나 외부 서버에 보내지 않습니다. Chrome 웹 스토어 배포가 아닌 압축해제 확장 방식입니다. **실제 Chrome에 설치한 뒤 전체 동작을 확인하는 검증은 아직 남아 있습니다.**
+자세한 내용은 [확장 설치 안내](browser-extension/README.ko.md)를 참고하세요. 탭 정보와 로컬 연결을 사용하며 페이지 본문·쿠키·비밀번호를 읽거나 외부 서버에 보내지 않습니다. Chrome 웹 스토어 배포가 아닌 압축해제 확장 방식입니다. **Windows의 실제 Chrome에서 기존 탭 전환과 창을 맨 앞으로 가져오는 동작을 확인했습니다. 다른 브라우저 사용 시나리오는 추가 검증이 필요합니다.**
 
 ## 5. 지원 키보드에 매핑 저장하기
 
@@ -156,7 +156,7 @@
 
 두 언어의 자체 테스트를 통과했고 영문 화면을 검토했습니다. 자동 검사는 설정·키 할당·전역 단축키·다이얼 이동과 크기·긴 이름·아이콘 가져오기·온보드 패킷·번역 누락·브라우저 탭 선택·로컬 메시지 연결을 다룹니다.
 
-이 결과가 온보드 저장의 유지나 모든 미니키보드의 호환성을 보장하지는 않습니다. 실제 Chrome 확장 연동, 관리자 권한 앱, 혼합 DPI 환경은 추가 확인이 필요합니다. 위에서 설명한 제한적인 기존 창 재사용 이외의 설치 앱은 각 앱의 실행 정책에 따릅니다.
+이 결과가 온보드 저장의 유지나 모든 미니키보드의 호환성을 보장하지는 않습니다. 실제 Chrome에서 기존 탭 전환과 창 활성화를 확인했으며, 다른 브라우저 사용 시나리오·관리자 권한 앱·혼합 DPI 환경은 추가 확인이 필요합니다. 위에서 설명한 제한적인 기존 창 재사용 이외의 설치 앱은 각 앱의 실행 정책에 따릅니다.
 
 ## 소스에서 빌드하기
 
@@ -188,4 +188,4 @@ New-Item -ItemType Directory -Force artifacts\checks
 
 외부 라이브러리·폰트 고지는 [THIRD-PARTY.md](THIRD-PARTY.md), `licenses/`, `fonts/`에 있습니다. 제조사 실행 파일과 디컴파일한 코드는 포함하지 않습니다. 프로젝트 전체에 적용할 오픈소스 라이선스는 아직 정하지 않았으며 외부 구성요소는 각각의 라이선스를 따릅니다.
 
-최종 확인: 2026-09-18 · 버전: 0.1.0-beta.1
+최종 확인: 2026-09-18 · 버전: 0.1.0-beta.2

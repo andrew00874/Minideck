@@ -454,6 +454,7 @@ namespace MiniDeck {
   }
   public void SelfTest(string folder) {
    List<string> results=new List<string>();
+   BrowserForeground.SelfTest();results.Add("PASS: Chrome foreground target resolves from the connected native host; unrelated and cyclic ancestors rejected");
    BoardProtocol.SelfTest();results.Add("PASS: onboard report encoding, slot order, media keys, invalid slot rejection (no USB writes)");
    IconStore.SelfTest();results.Add("PASS: SVG/PNG import, transparency, aspect ratio, source independence, invalid icon rejection, settings roundtrip");
    Show(); Application.DoEvents();
