@@ -17,6 +17,8 @@ namespace MiniDeck {
   public string Target { get; set; }
   public string Arguments { get; set; }
   public string IconPath { get; set; }
+  [ScriptIgnore] public Action Invoke {get;set;}
+  [ScriptIgnore] public string ServiceIcon {get;set;}
   public override string ToString() { return Name; }
  }
  public class Settings {
@@ -25,7 +27,8 @@ namespace MiniDeck {
   public int? OverlayX { get; set; }
   public int? OverlayY { get; set; }
   public int DialSize {get;set;}
-  public Settings() { Apps = new List<AppEntry>(); Keys = new int[] {0,1,2}; }
+  public List<TextEngine> Engines {get;set;}
+  public Settings() { Apps = new List<AppEntry>(); Keys = new int[] {0,1,2}; Engines=TextActions.Defaults(); }
  }
  static class Storage {
   public static string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MiniDeck");
@@ -36,6 +39,8 @@ namespace MiniDeck {
     Settings s = new JavaScriptSerializer().Deserialize<Settings>(File.ReadAllText(FileName));
     if (s == null || s.Apps == null || s.Keys == null || s.Keys.Length != 3 || s.Apps.Any(a => a == null || String.IsNullOrWhiteSpace(a.Target))) throw new Exception(L10n.T("설정 형식이 올바르지 않습니다."));
     for (int i=0;i<3;i++) if(s.Keys[i] < -1 || s.Keys[i]>=s.Apps.Count) s.Keys[i]=-1;
+    if(s.Engines==null)s.Engines=TextActions.Defaults();
+    foreach(TextEngine engine in s.Engines){if(engine==null)throw new Exception("Invalid text engine");if(String.IsNullOrWhiteSpace(engine.Id))engine.Id=Guid.NewGuid().ToString("N");TextActions.BuildUrl(engine,"test");}
     return s;
    } catch(Exception ex) {
     MessageBox.Show(L10n.T("설정을 읽지 못했습니다. 기존 파일은 유지합니다.\n") + FileName + "\n" + ex.Message, "MiniDeck");
@@ -92,6 +97,12 @@ namespace MiniDeck {
   public int Selected;
   public Action ClosedOverlay;
   public Action PositionChanged;
+  List<AppEntry> items;
+  List<AppEntry> Items {get{return items??Data.Apps;}}
+  string modeLabel=L10n.T("앱"),actionText=L10n.T("눌러서 열기"),emptyText=L10n.T("설정에서 앱을 추가하세요"),contextText="";
+  public void Configure(List<AppEntry> entries,string mode,string action,string empty,string context,int selected){
+   items=entries;modeLabel=mode;actionText=action;emptyText=empty;contextText=context??"";Selected=selected;
+  }
   int Diameter {get{return Math.Max(280,Math.Min(560,Data.DialSize==0?360:Data.DialSize));}}
   static readonly Color DialBackground=Color.FromArgb(247,247,242), DialText=Color.FromArgb(33,47,48), DialMuted=Color.FromArgb(86,104,103);
   const float DesignSize=540f;
@@ -114,7 +125,7 @@ namespace MiniDeck {
    caption.MouseDown+=delegate(object sender,MouseEventArgs e){Point p=PointToClient(caption.PointToScreen(e.Location));OnMouseDown(new MouseEventArgs(e.Button,e.Clicks,p.X,p.Y,e.Delta));};
    animation.Interval=16; animation.Tick+=delegate {
     bool moving=false;
-    for(int i=StartIndex();i<Math.Min(StartIndex()+8,Data.Apps.Count);i++) {
+    for(int i=StartIndex();i<Math.Min(StartIndex()+8,Items.Count);i++) {
      float value=emphasis.ContainsKey(i)?emphasis[i]:0, target=i==Selected?1:0;
      value+=(target-value)*0.24f; if(Math.Abs(target-value)<0.01f)value=target;else moving=true;emphasis[i]=value;
     }
@@ -151,7 +162,7 @@ namespace MiniDeck {
    if(e.Y>=Diameter){if(fullName.Height>caption.Height-20){captionScroll=Math.Max(0,Math.Min(fullName.Height-caption.Height+20,captionScroll+(e.Y<(Diameter+3+caption.Height/2)?-48:48)));Present();expiry.Stop();}return;}
    float x=e.X*DesignSize/Diameter,y=e.Y*DesignSize/Diameter;
    if(Distance(x,y,270,270)<77) {Execute();return;}
-   int start=StartIndex(),count=Math.Min(8,Data.Apps.Count-start);
+   int start=StartIndex(),count=Math.Min(8,Items.Count-start);
    for(int n=0;n<count;n++) {PointF p=Position(n,count);int i=start+n;float size=74+26*Level(i);if(Distance(x,y,p.X,p.Y)<=size/2) {Selected=i;Execute();return;} }
   }
   Point VisibleLocation(Point requested) {
@@ -165,7 +176,8 @@ namespace MiniDeck {
   static double Distance(float x,float y,float cx,float cy) {return Math.Sqrt((x-cx)*(x-cx)+(y-cy)*(y-cy));}
   PointF Position(int n,int count) {double a=-Math.PI/2+n*2*Math.PI/Math.Max(1,count);return new PointF(270+(float)Math.Cos(a)*171,270+(float)Math.Sin(a)*171);}
   void LayoutCaption(){
-   fullName.Text=Data.Apps.Count==0?L10n.T("설정에서 앱을 추가하세요"):Data.Apps[Selected].Name;
+   Selected=Math.Max(0,Math.Min(Selected,Items.Count-1));
+   fullName.Text=Items.Count==0?emptyText:Items[Selected].Name+(String.IsNullOrEmpty(contextText)?"":"\n"+contextText);
    Font nextFont=Typography.ForText(fullName.Text,16,true,GraphicsUnit.Pixel);
    if(fullName.Font.Equals(nextFont))nextFont.Dispose();else {Font oldFont=fullName.Font;fullName.Font=nextFont;oldFont.Dispose();}
    using(Bitmap measure=new Bitmap(1,1))using(Graphics g=Graphics.FromImage(measure)){
@@ -179,9 +191,9 @@ namespace MiniDeck {
   }
   public void ResizeDial(){LayoutCaption();Location=VisibleLocation(Location);Present();}
   public void Reveal() {
-   Selected=Math.Max(0,Math.Min(Selected,Data.Apps.Count-1));
+   Selected=Math.Max(0,Math.Min(Selected,Items.Count-1));
    LayoutCaption();
-   emphasis.Clear();for(int i=0;i<Data.Apps.Count;i++)emphasis[i]=i==Selected?1:0;
+   emphasis.Clear();for(int i=0;i<Items.Count;i++)emphasis[i]=i==Selected?1:0;
    Rectangle work=Screen.FromPoint(Cursor.Position).WorkingArea;
    Point desired=Data.OverlayX.HasValue&&Data.OverlayY.HasValue?new Point(Data.OverlayX.Value,Data.OverlayY.Value):new Point(work.Right-Width-24,work.Top+(work.Height-Height)/2);
    Location=VisibleLocation(desired);
@@ -190,13 +202,13 @@ namespace MiniDeck {
   void ResetTimer() { expiry.Stop(); if(!pointerDown)expiry.Start(); }
   public void Turn(int delta) {
    if(!Visible) Reveal();
-   if(Data.Apps.Count>0) Selected=(Selected+delta+Data.Apps.Count)%Data.Apps.Count;
+   if(Items.Count>0) Selected=(Selected+delta+Items.Count)%Items.Count;
    LayoutCaption();Location=VisibleLocation(Location);
-   if(SystemInformation.IsMenuAnimationEnabled)animation.Start();else {emphasis.Clear();for(int i=0;i<Data.Apps.Count;i++)emphasis[i]=i==Selected?1:0;} ResetTimer(); Present();
+   if(SystemInformation.IsMenuAnimationEnabled)animation.Start();else {emphasis.Clear();for(int i=0;i<Items.Count;i++)emphasis[i]=i==Selected?1:0;} ResetTimer(); Present();
   }
   public void Push() { if(!Visible) Reveal(); else Execute(); }
-  void Execute() { if(pointerDown||Data.Apps.Count==0) return; AppEntry a=Data.Apps[Selected]; Dismiss(); Launcher.Run(a); }
-  public void Dismiss() { if(pointerDown)FinishPointer();expiry.Stop(); animation.Stop(); Hide(); if(ClosedOverlay!=null) ClosedOverlay(); }
+  void Execute() { if(pointerDown||Items.Count==0) return; AppEntry a=Items[Selected]; Dismiss();try{if(a.Invoke!=null)a.Invoke();else Launcher.Run(a);}catch(Exception ex){MessageBox.Show(ex.Message,"MiniDeck",MessageBoxButtons.OK,MessageBoxIcon.Information);} }
+  public void Dismiss() { bool wasVisible=Visible;if(pointerDown)FinishPointer();expiry.Stop(); animation.Stop(); Hide();contextText="";fullName.Text="";if(wasVisible&&ClosedOverlay!=null) ClosedOverlay(); }
   protected override void OnPaintBackground(PaintEventArgs e){}
   protected override void OnPaint(PaintEventArgs e){Present();}
   void Present(){if(!Visible||presenting)return;presenting=true;try{using(Bitmap frame=RenderFrame())LayeredWindow.Present(Handle,frame,Location);}finally{presenting=false;}}
@@ -237,7 +249,7 @@ namespace MiniDeck {
    g.Restore(glassClip);
    using(LinearGradientBrush center=new LinearGradientBrush(new Rectangle(181,181,178,178),Color.FromArgb(248,255,255,255),Color.FromArgb(235,237,246,240),65f))g.FillEllipse(center,181,181,178,178);
    using(Pen centerBorder=new Pen(Color.FromArgb(215,255,255,255),2))g.DrawEllipse(centerBorder,181,181,178,178);
-   int start=StartIndex(),count=Math.Min(8,Data.Apps.Count-start);
+   int start=StartIndex(),count=Math.Min(8,Items.Count-start);
    for(int n=0;n<count;n++) {
     int i=start+n;float level=Level(i),size=74+26*level;PointF p=Position(n,count);
     RectangleF box=new RectangleF(p.X-size/2,p.Y-size/2,size,size);
@@ -245,11 +257,12 @@ namespace MiniDeck {
     using(LinearGradientBrush fill=new LinearGradientBrush(box,Color.FromArgb(248,255,255,255),Color.FromArgb(231,(int)(245-16*level),(int)(249-7*level),(int)(246-12*level)),75f))g.FillEllipse(fill,box);
     using(Pen edge=new Pen(Color.FromArgb(218,255,255,255),1.8f))g.DrawEllipse(edge,box);
     if(i==Selected){using(Pen rim=new Pen(Color.FromArgb(135,69,139,111),1.8f))g.DrawEllipse(rim,box);using(Brush dot=new SolidBrush(Color.FromArgb(69,139,111)))g.FillEllipse(dot,p.X-3,p.Y+size/2+13,6,6);}
-    DrawApp(g,Data.Apps[i],p.X,p.Y,49+13*level);
+    DrawApp(g,Items[i],p.X,p.Y,49+13*level);
    }
-   if(Data.Apps.Count>0)DrawApp(g,Data.Apps[Selected],270,251,58);
-   using(Font action=Typography.Create(Math.Max(20,12*DesignSize/Diameter),false,GraphicsUnit.Pixel))PaintText(g,Data.Apps.Count==0?L10n.T("앱 추가"):L10n.T("눌러서 열기"),action,new RectangleF(193,292,154,30),DialText);
-   string hint=Data.Apps.Count==0?"":(Selected+1)+" / "+Data.Apps.Count;
+   using(Font mode=Typography.Create(16,true,GraphicsUnit.Pixel))PaintText(g,modeLabel,mode,new RectangleF(190,204,160,26),DialMuted);
+   if(Items.Count>0)DrawApp(g,Items[Selected],270,258,50);
+   using(Font action=Typography.Create(Math.Max(20,12*DesignSize/Diameter),false,GraphicsUnit.Pixel))PaintText(g,Items.Count==0?modeLabel:actionText,action,new RectangleF(193,292,154,30),DialText);
+   string hint=Items.Count==0?"":(Selected+1)+" / "+Items.Count;
    using(Font small=Typography.Latin(Math.Max(16,11*DesignSize/Diameter),false,GraphicsUnit.Pixel))PaintText(g,hint,small,new RectangleF(198,322,144,28),DialMuted);
   }
   static void PaintText(Graphics g,string text,Font font,RectangleF bounds,Color color) {
@@ -260,6 +273,7 @@ namespace MiniDeck {
    }
   }
   void DrawApp(Graphics g,AppEntry app,float x,float y,float size) {
+   if(!String.IsNullOrWhiteSpace(app.ServiceIcon)) {g.DrawImage(EngineIcons.Get(app.ServiceIcon),new RectangleF(x-size/2,y-size/2,size,size));return;}
    if(!String.IsNullOrWhiteSpace(app.IconPath)) {g.DrawImage(IconStore.Get(app),new RectangleF(x-size/2,y-size/2,size,size));return;}
    if(app.Name.Equals("Codex",StringComparison.OrdinalIgnoreCase)) {
     using(Pen pen=new Pen(DialText,size*0.08f)){pen.StartCap=LineCap.Round;pen.EndCap=LineCap.Round;g.DrawLines(pen,new PointF[]{new PointF(x-size*.35f,y-size*.25f),new PointF(x-size*.10f,y),new PointF(x-size*.35f,y+size*.25f)});g.DrawLine(pen,x+size*.05f,y+size*.25f,x+size*.36f,y+size*.25f);}return;
@@ -273,12 +287,12 @@ namespace MiniDeck {
   }
   protected override void Dispose(bool disposing) { if(disposing) { expiry.Dispose(); animation.Dispose();caption.Dispose(); foreach(Icon icon in icons.Values) icon.Dispose(); } base.Dispose(disposing); }
   public void TestLayout(string folder){
-   int previous=Data.DialSize;string oldName=Data.Apps[Selected].Name;
+   int previous=Data.DialSize;string oldName=Items[Selected].Name;
    string longName="Very Long Application Name / 프로젝트 개발 환경과 문서 도구를 여는 아주 긴 프로그램 이름 ";
-   Data.Apps[Selected].Name=String.Concat(Enumerable.Repeat(longName,12));
+   Items[Selected].Name=String.Concat(Enumerable.Repeat(longName,12));
    foreach(int size in new int[]{280,360,560}) {
     Data.DialSize=size;Reveal();
-    if(Width!=size||fullName.Text!=Data.Apps[Selected].Name||fullName.AutoEllipsis||fullName.Height<=caption.Height)throw new Exception("Long title or resize layout failed");
+    if(Width!=size||fullName.Text!=Items[Selected].Name||fullName.AutoEllipsis||fullName.Height<=caption.Height)throw new Exception("Long title or resize layout failed");
     using(Bitmap b=RenderFrame()){
      if(b.GetPixel(0,0).A!=0)throw new Exception("Layer corner is opaque");
      bool partial=false;for(int x=0;x<b.Width;x++)if(b.GetPixel(x,10).A>0&&b.GetPixel(x,10).A<255)partial=true;
@@ -286,7 +300,7 @@ namespace MiniDeck {
     }
     Storage.Save(Data);if(Storage.Load().DialSize!=size)throw new Exception("Size persistence failed");Dismiss();
    }
-   Data.Apps[Selected].Name=oldName;Data.DialSize=previous;
+   Items[Selected].Name=oldName;Data.DialSize=previous;
   }
   public void TestPosition() {
    Reveal();Point before=Location;
@@ -340,8 +354,9 @@ namespace MiniDeck {
   void AddField(string text,TextBox field,int y) { Controls.Add(new Label {Text=text,Left=20,Top=y,Width=520}); field.AccessibleName=text;field.SetBounds(20,y+26,525,26); Controls.Add(field); }
  }
  class MainForm : Form {
-  Settings data; Overlay overlay; NotifyIcon tray; ListBox apps=new ListBox(); ComboBox[] keys=new ComboBox[3];
-  Label status=new Label(); bool refresh,exiting; bool escapeRegistered; List<int> registered=new List<int>();
+  Settings data; Overlay overlay; NotifyIcon tray; ListBox apps=new ListBox(); Button[] modeButtons=new Button[3];
+  DialMode mode=DialMode.Apps;int[] selections=new int[3];int captureVersion;bool capturing;
+  Label status=new Label(); bool exiting; bool escapeRegistered; List<int> registered=new List<int>();
   public MainForm(Settings settings) {
    Icon=Brand.Icon;
    data=settings; Text=L10n.T("MiniDeck · 3키 + 노브 런처"); Font=Typography.Create(10); ClientSize=new Size(800,720);
@@ -369,15 +384,14 @@ namespace MiniDeck {
    ButtonAt(L10n.T("아래로 ↓"),490,306,delegate { MoveEntry(1); });
    ButtonAt(L10n.T("선택 앱 실행"),490,352,delegate { if(apps.SelectedIndex>=0) Launcher.Run(data.Apps[apps.SelectedIndex]); });
    ButtonAt(L10n.T("키보드 온보드 설정"),620,22,delegate {overlay.Dismiss();using(OnboardForm form=new OnboardForm())form.ShowDialog(this);});
+   string[] labels={L10n.T("등록한 앱"),L10n.T("열린 창"),L10n.T("검색·번역")};
    for(int i=0;i<3;i++) {
-    int n=i; int x=30+i*250;
-    Controls.Add(new Label {Text=L10n.T("키 ")+(i+1)+"  ·  Ctrl+Alt+Shift+F"+(i+1),Left=x,Top=433,Width=240});
-    keys[i]=new DarkComboBox {Left=x,Top=461,Width=233,DropDownStyle=ComboBoxStyle.DropDownList};
-    keys[i].AccessibleName=L10n.T("키 ")+(i+1)+L10n.T("에 할당할 앱");
-    keys[i].DrawMode=DrawMode.OwnerDrawFixed;keys[i].ItemHeight=26;keys[i].FlatStyle=FlatStyle.Flat;
-    keys[i].DrawItem+=delegate(object sender,DrawItemEventArgs e){ComboBox box=(ComboBox)sender;using(Brush b=new SolidBrush(Theme.Surface))e.Graphics.FillRectangle(b,e.Bounds);if(e.Index>=0)TextRenderer.DrawText(e.Graphics,box.Items[e.Index].ToString(),box.Font,e.Bounds,Theme.Text,TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis);e.DrawFocusRectangle();};
-    keys[i].SelectedIndexChanged+=delegate { if(!refresh) {data.Keys[n]=keys[n].SelectedIndex-1; Save();} }; Controls.Add(keys[i]);
+    int n=i,x=30+i*250;
+    Controls.Add(new Label{Text=L10n.T("키 ")+(i+1)+"  ·  Ctrl+Alt+Shift+F"+(i+1),Left=x,Top=433,Width=240});
+    modeButtons[i]=new Button{Text=(i+1)+"   "+labels[i],Left=x,Top=461,Width=233,Height=38,AccessibleName=labels[i]};
+    modeButtons[i].Click+=delegate{SwitchMode((DialMode)n);};Controls.Add(modeButtons[i]);
    }
+   ButtonAt(L10n.T("검색·번역 엔진"),620,652,delegate{CancelCapture();overlay.Dismiss();using(var form=new EnginesForm(data.Engines))if(form.ShowDialog(this)==DialogResult.OK){data.Engines=form.Result;Save();}});
    ButtonAt(L10n.T("◀ 회전"),30,510,delegate { OpenOverlay(-1); });
    ButtonAt(L10n.T("누르기 / 열기"),200,510,delegate { OpenOverlay(0); });
    ButtonAt(L10n.T("회전 ▶"),370,510,delegate { OpenOverlay(1); });
@@ -385,25 +399,23 @@ namespace MiniDeck {
    startup.CheckedChanged+=delegate { try { using(RegistryKey k=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) {if(startup.Checked) k.SetValue("MiniDeck","\""+Application.ExecutablePath+"\" --background"); else k.DeleteValue("MiniDeck",false);} } catch(Exception ex) {MessageBox.Show(ex.Message);} }; Controls.Add(startup);
    Controls.Add(new Label {Text=L10n.T("노브 매핑: Ctrl+Alt+Shift + F4(왼쪽) / F5(오른쪽) / F6(누르기)\n닫기 버튼을 누르면 트레이에 남습니다. 종료는 트레이 메뉴에서 선택하세요."),Left=30,Top=564,Width=745,Height=45});
    status.SetBounds(30,612,745,30); Controls.Add(status);
-   overlay=new Overlay(data); overlay.PositionChanged=Save; overlay.ClosedOverlay=delegate { if(escapeRegistered) Native.UnregisterHotKey(Handle,99); escapeRegistered=false; };
+   overlay=new Overlay(data); overlay.PositionChanged=Save; overlay.ClosedOverlay=delegate { selections[(int)mode]=overlay.Selected;overlay.Configure(null,L10n.T("앱"),L10n.T("눌러서 열기"),L10n.T("설정에서 앱을 추가하세요"),"",selections[0]);if(escapeRegistered) Native.UnregisterHotKey(Handle,99); escapeRegistered=false; };
    Controls.Add(new Label{Text=L10n.T("다이얼 크기"),Left=30,Top=660,Width=110});
    TrackBar dialSize=new TrackBar{Minimum=280,Maximum=560,TickFrequency=40,SmallChange=10,LargeChange=40,Value=Math.Max(280,Math.Min(560,data.DialSize==0?360:data.DialSize)),Left=140,Top=648,Width=410,Height=45,AccessibleName=L10n.T("다이얼 크기")};
-   Label sizeValue=new Label{Text=dialSize.Value+" px",Left=560,Top=660,Width=100};Controls.Add(dialSize);Controls.Add(sizeValue);
+   Label sizeValue=new Label{Text=dialSize.Value+" px",Left=560,Top=660,Width=55};Controls.Add(dialSize);Controls.Add(sizeValue);
    dialSize.ValueChanged+=delegate{data.DialSize=dialSize.Value;sizeValue.Text=dialSize.Value+" px";overlay.ResizeDial();Save();};
    tray=new NotifyIcon {Icon=Brand.Icon,Text="MiniDeck",Visible=true};
-   ContextMenuStrip menu=new ContextMenuStrip(); menu.Items.Add(L10n.T("설정 열기"),null,delegate {ShowSettings();}); menu.Items.Add(L10n.T("앱 목록"),null,delegate {OpenOverlay(0);}); menu.Items.Add(L10n.T("종료"),null,delegate {exiting=true;Close();}); tray.ContextMenuStrip=menu; tray.DoubleClick+=delegate {ShowSettings();};
+   ContextMenuStrip menu=new ContextMenuStrip(); menu.Items.Add(L10n.T("설정 열기"),null,delegate {ShowSettings();}); menu.Items.Add(L10n.T("앱 목록"),null,delegate {SwitchMode(DialMode.Apps);}); menu.Items.Add(L10n.T("종료"),null,delegate {exiting=true;Close();}); tray.ContextMenuStrip=menu; tray.DoubleClick+=delegate {ShowSettings();};
    RefreshList(0);
-   Theme.Apply(this);
+   Theme.Apply(this);UpdateModeButtons();
   }
   void ButtonAt(string text,int x,int y,Action action) { Button b=new Button {Text=text,Left=x,Top=y,Width=150,Height=35}; b.Click+=delegate { action(); }; Controls.Add(b); }
   bool HasStartup() { using(RegistryKey k=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) return k!=null && k.GetValue("MiniDeck")!=null; }
   void ShowSettings() { Show(); WindowState=FormWindowState.Normal; Activate(); }
   void Save() { try {Storage.Save(data);} catch(Exception ex) {MessageBox.Show(this,L10n.T("설정 저장 실패\n")+ex.Message);} }
   void RefreshList(int selected) {
-   refresh=true; apps.Items.Clear(); foreach(AppEntry a in data.Apps) apps.Items.Add(a);
+   apps.Items.Clear(); foreach(AppEntry a in data.Apps) apps.Items.Add(a);
    if(data.Apps.Count>0) apps.SelectedIndex=Math.Max(0,Math.Min(selected,data.Apps.Count-1));
-   for(int i=0;i<3;i++) { keys[i].Items.Clear(); keys[i].Items.Add(L10n.T("(할당 없음)")); foreach(AppEntry a in data.Apps) keys[i].Items.Add(a.Name); keys[i].SelectedIndex=data.Keys[i]+1; }
-   refresh=false;
   }
   void EditEntry(bool edit) {
    int i=apps.SelectedIndex; if(edit&&i<0) return;
@@ -423,8 +435,36 @@ namespace MiniDeck {
    Save();RefreshList(j);
   }
   void OpenOverlay(int direction) {
+   if(capturing)return;
+   if(!overlay.Visible&&mode!=DialMode.Apps){SwitchMode(mode);return;}
    if(direction==0)overlay.Push();else overlay.Turn(direction);
-   if(overlay.Visible&&!escapeRegistered)escapeRegistered=Native.RegisterHotKey(Handle,99,0,27);
+   RegisterEscape();
+  }
+  void RegisterEscape(){if(!escapeRegistered)escapeRegistered=Native.RegisterHotKey(Handle,99,0,27);}
+  void CancelCapture(){captureVersion++;capturing=false;if(!overlay.Visible&&escapeRegistered){Native.UnregisterHotKey(Handle,99);escapeRegistered=false;}}
+  void UpdateModeButtons(){for(int i=0;i<modeButtons.Length;i++){modeButtons[i].BackColor=i==(int)mode?Color.FromArgb(53,83,78):Theme.Surface;modeButtons[i].ForeColor=Theme.Text;}}
+  async void SwitchMode(DialMode next){
+   IntPtr source=WindowSwitcher.GetForegroundWindow();
+   CancelCapture();overlay.Dismiss();mode=next;UpdateModeButtons();
+   if(mode==DialMode.Apps){overlay.Reveal();RegisterEscape();return;}
+   if(mode==DialMode.Windows){
+    var windows=WindowSwitcher.List();int index=windows.Count>1&&windows[0].Handle==source?1:0;
+    overlay.Configure(windows.Select(w=>w.Entry()).ToList(),L10n.T("열린 창"),L10n.T("눌러서 전환"),L10n.T("전환할 창이 없습니다"),"",index);
+    overlay.Reveal();RegisterEscape();return;
+   }
+   capturing=true;int request=captureVersion;RegisterEscape();
+   status.Text=L10n.T("선택한 글을 가져오는 중… 키에서 손을 떼 주세요.");
+   try{
+    string text=await SelectedTextCapture.Read(source,()=>captureVersion!=request||IsDisposed);
+    if(request!=captureVersion||IsDisposed)return;
+    if(String.IsNullOrWhiteSpace(text))throw new InvalidOperationException(L10n.T("선택한 글을 가져오지 못했습니다. 복사 가능한 글을 선택한 뒤 3번 키를 눌러 주세요."));
+    ShowTextDial(text);status.Text=L10n.T("엔진을 고른 뒤 노브를 누르면 선택한 글을 전달합니다. Esc로 취소.");
+   }catch(Exception ex){if(request==captureVersion&&!IsDisposed){status.Text=ex.Message;tray.ShowBalloonTip(3500,"MiniDeck",ex.Message,ToolTipIcon.Info);}}
+   finally{if(request==captureVersion){capturing=false;if(!overlay.Visible&&escapeRegistered){Native.UnregisterHotKey(Handle,99);escapeRegistered=false;}}}
+  }
+  void ShowTextDial(string text){
+   var entries=data.Engines.Select(e=>new AppEntry{Name=e.Name,Target="",ServiceIcon=EngineIcons.For(e),Invoke=delegate{BrowserLink.Navigate(TextActions.BuildUrl(e,text),e.Id);}}).ToList();
+   overlay.Configure(entries,L10n.T("검색·번역"),L10n.T("눌러서 보내기"),L10n.T("설정에서 엔진을 추가하세요"),text,selections[2]);overlay.Reveal();RegisterEscape();
   }
   protected override void OnHandleCreated(EventArgs e) {
    base.OnHandleCreated(e); List<string> failed=new List<string>();
@@ -435,14 +475,14 @@ namespace MiniDeck {
   protected override void WndProc(ref Message m) {
    if(m.Msg==0x0312) {
     int id=m.WParam.ToInt32();
-    if(id>=1&&id<=3) { int i=data.Keys[id-1];if(i>=0&&i<data.Apps.Count){overlay.Dismiss();Launcher.Run(data.Apps[i]);} }
-    else if(id==4)OpenOverlay(-1);else if(id==5)OpenOverlay(1);else if(id==6)OpenOverlay(0);else if(id==99)overlay.Dismiss();
+    if(id>=1&&id<=3) SwitchMode((DialMode)(id-1));
+    else if(id==4)OpenOverlay(-1);else if(id==5)OpenOverlay(1);else if(id==6)OpenOverlay(0);else if(id==99){CancelCapture();overlay.Dismiss();}
    }
    base.WndProc(ref m);
   }
   protected override void OnFormClosing(FormClosingEventArgs e) {
    if(!exiting && e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();return;}
-   overlay.Dismiss(); foreach(int id in registered)Native.UnregisterHotKey(Handle,id);
+   CancelCapture();overlay.Dismiss(); foreach(int id in registered)Native.UnregisterHotKey(Handle,id);
    overlay.Dispose();tray.Visible=false;tray.Dispose();base.OnFormClosing(e);
   }
   public void Preview(string folder) {
@@ -450,15 +490,43 @@ namespace MiniDeck {
    using(EntryEditor editor=new EntryEditor(data.Apps.FirstOrDefault())) {editor.Show();Application.DoEvents();using(Bitmap b=new Bitmap(editor.Width,editor.Height)){editor.DrawToBitmap(b,new Rectangle(Point.Empty,editor.Size));b.Save(Path.Combine(folder,"icon-editor-preview.png"));}editor.Close();}
    using(OnboardForm onboard=new OnboardForm()){onboard.Show();Application.DoEvents();using(Bitmap b=new Bitmap(onboard.Width,onboard.Height)){onboard.DrawToBitmap(b,new Rectangle(Point.Empty,onboard.Size));b.Save(Path.Combine(folder,"onboard-preview.png"));}onboard.Close();}
    overlay.Reveal();Application.DoEvents();using(Bitmap b=overlay.RenderFrame()){b.Save(Path.Combine(folder,"overlay-preview.png"));}
+   overlay.Dismiss();mode=DialMode.Text;ShowTextDial(L10n.English?"Make room for a little curiosity.":"오늘도 새로운 것을 발견하는 즐거움.");using(Bitmap b=overlay.RenderFrame())b.Save(Path.Combine(folder,"text-preview.png"));overlay.Dismiss();mode=DialMode.Apps;
+   using(var engines=new EnginesForm(data.Engines)){engines.Show();Application.DoEvents();using(Bitmap b=new Bitmap(engines.Width,engines.Height)){engines.DrawToBitmap(b,new Rectangle(Point.Empty,engines.Size));b.Save(Path.Combine(folder,"engines-preview.png"));}engines.Close();}
    exiting=true;Close();
+  }
+  void TestModes(List<string> results){
+   int calls=0;var sample=new List<AppEntry>{new AppEntry{Name="Test action",Target="",ServiceIcon="search",Invoke=delegate{calls++;}}};
+   overlay.Configure(sample,"Test","Confirm","Empty","Selected text",0);overlay.Reveal();overlay.Turn(1);overlay.Dismiss();
+   if(calls!=0)throw new Exception("Cancelled action executed");
+   overlay.Configure(sample,"Test","Confirm","Empty","Selected text",0);overlay.Push();if(calls!=0)throw new Exception("Reveal executed action");overlay.Push();
+   if(calls!=1||overlay.Visible)throw new Exception("Confirmed action did not execute exactly once");
+   mode=DialMode.Text;ShowTextDial("private test selection");overlay.Dismiss();
+   if(new JavaScriptSerializer().Serialize(data).Contains("private test selection"))throw new Exception("Text persisted in settings");
+   mode=DialMode.Apps;overlay.Selected=0;selections=new int[3];
+   var legacy=new JavaScriptSerializer().Deserialize<Settings>("{\"Apps\":[],\"Keys\":[-1,-1,-1]}");
+   if(legacy.Engines==null||legacy.Engines.Count!=4)throw new Exception("Legacy settings migration failed");
+   using(var probe=new Form{Text="MiniDeck capture test",Width=360,Height=160})using(var field=new TextBox{Text="MiniDeck selected text",Dock=DockStyle.Fill,Multiline=true}){
+    probe.Controls.Add(field);probe.Show();probe.Activate();field.Focus();field.Select(9,8);Application.DoEvents();
+    IntPtr fieldHandle=field.Handle;
+    var read=System.Threading.Tasks.Task.Factory.StartNew(()=>SelectedTextCapture.ReadElement(System.Windows.Automation.AutomationElement.FromHandle(fieldHandle)));Stopwatch timer=Stopwatch.StartNew();
+    while(!read.IsCompleted&&timer.ElapsedMilliseconds<6000){Application.DoEvents();System.Threading.Thread.Sleep(10);}
+    if(!read.IsCompleted||String.Join("",read.GetAwaiter().GetResult()??new string[0])!="selected")throw new Exception("Selected text capture failed");
+    WindowChoice window=new WindowChoice{Handle=probe.Handle,ProcessId=(uint)Process.GetCurrentProcess().Id};
+    if(!WindowSwitcher.IsCurrent(window))throw new Exception("Live window rejected");
+    if(WindowSwitcher.List().Any(w=>w.ProcessId==(uint)Process.GetCurrentProcess().Id))throw new Exception("Own windows leaked into switcher");
+    probe.Close();if(WindowSwitcher.IsCurrent(window))throw new Exception("Closed window accepted");
+   }
+   Show();Activate();results.Add("PASS: UI Automation selection from a real text control, legacy settings migration, transient text, deferred confirmation, cancellation and stale window rejection");
   }
   public void SelfTest(string folder) {
    List<string> results=new List<string>();
+   TextActions.SelfTest();results.Add("PASS: text URL encoding, authority/scheme validation and length limits");
    BrowserForeground.SelfTest();results.Add("PASS: Chrome foreground target resolves from the connected native host; unrelated and cyclic ancestors rejected");
    BoardProtocol.SelfTest();results.Add("PASS: onboard report encoding, slot order, media keys, invalid slot rejection (no USB writes)");
    IconStore.SelfTest();results.Add("PASS: SVG/PNG import, transparency, aspect ratio, source independence, invalid icon rejection, settings roundtrip");
    Show(); Application.DoEvents();
    if(registered.Count!=6)throw new Exception("Hotkey registration failed"); results.Add("PASS: six global hotkeys registered");
+   TestModes(results);
    apps.SelectedIndex=0; MoveEntry(1);
    if(data.Keys[0]!=1 || data.Keys[1]!=0)throw new Exception("Reorder lost key bindings"); results.Add("PASS: reorder preserves key bindings");
    DeleteEntry(); if(data.Keys[0]!=-1 || data.Keys[2]!=1)throw new Exception("Delete lost key bindings"); results.Add("PASS: delete clears and shifts bindings");

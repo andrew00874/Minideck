@@ -25,7 +25,7 @@ jobs:
       - name: Build Korean and English packages
         shell: pwsh
         run: |
-          $version = '0.1.0-beta.2'
+          $version = '0.2.0-beta.1'
           if ($env:GITHUB_REF_TYPE -eq 'tag') { $version = $env:GITHUB_REF_NAME.Substring(1) }
           ./scripts/package.ps1 -Version $version
       - uses: actions/upload-artifact@v4

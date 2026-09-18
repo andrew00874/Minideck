@@ -14,7 +14,11 @@ Expected extension ID: `mecekhgbdppcabapefkdljicahcnibcf`.
 
 The extension reuses the most recently used normal tab with the same origin (scheme, hostname and port), without navigating or refreshing it. A minimized window is restored. If no matching tab exists, a new one is opened. Different subdomains remain separate. Incognito tabs and other profiles are excluded.
 
-Install in one profile only. The extension uses the `tabs`, `nativeMessaging` and `alarms` permissions. It works with tab URLs and identifiers, not page contents, cookies or passwords. It sends only the operation result to MiniDeck and does not connect to a remote server. The native host uses a Windows named pipe restricted to your current user.
+Install in one profile only. The extension uses `tabs`, `nativeMessaging`, `alarms`, and `storage`. It does not scrape page contents, cookies or passwords. The native host uses a Windows named pipe restricted to your current user.
+
+Version 1.1.0 adds selected-text actions: after you confirm an engine in MiniDeck, the extension opens its result URL containing the selected text. It updates only that engine's dedicated result tab, leaving ordinary website entries unchanged. Session storage contains tab IDs and origins, not the query or original text. Restarting Chrome or reloading the extension resets that tracking. Confirmed queries can appear in normal browser history and are sent to the selected service.
+
+When upgrading from 1.0.0, update both MiniDeck executables and this folder, then click **Reload** for MiniDeck Browser Link at `chrome://extensions`. A capability probe contains no selected text and refuses to use an outdated host/extension for text actions.
 
 When disconnected, click the extension icon to reconnect or wait up to 30 seconds. MiniDeck will show an error instead of falling back to opening duplicate tabs. If you move the MiniDeck folder, run `setup.ps1` again. Close Chrome before replacing the host executable if it is in use.
 

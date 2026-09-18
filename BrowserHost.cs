@@ -18,23 +18,27 @@ class BrowserHost {
  static bool ReadExact(Stream input,byte[] data) {
   int offset=0;while(offset<data.Length){int n=input.Read(data,offset,data.Length-offset);if(n==0)return false;offset+=n;}return true;
  }
- static void Main() {
+ static void Main(string[] args) {
   Stream input=Console.OpenStandardInput(),output=Console.OpenStandardOutput();
   var inputThread=new Thread(delegate() {
    try {while(true){byte[] size=new byte[4];if(!ReadExact(input,size))break;int n=BitConverter.ToInt32(size,0);if(n<1||n>65536)break;byte[] bytes=new byte[n];if(!ReadExact(input,bytes))break;Responses.Add(Encoding.UTF8.GetString(bytes));}}catch{}
    Environment.Exit(0);
   });inputThread.IsBackground=true;inputThread.Start();
   SecurityIdentifier user=WindowsIdentity.GetCurrent().User;
+  string pipeName="MiniDeck.Browser."+user.Value;
+  if(args.Length==2&&args[0]=="--test-pipe"&&System.Text.RegularExpressions.Regex.IsMatch(args[1],"^[a-zA-Z0-9-]{1,64}$"))pipeName+=".test."+args[1];
   var security=new PipeSecurity();security.SetAccessRuleProtection(true,false);security.AddAccessRule(new PipeAccessRule(user,PipeAccessRights.FullControl,AccessControlType.Allow));
   while(true) {
    try {
-    using(var pipe=new NamedPipeServerStream("MiniDeck.Browser."+user.Value,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous,8192,8192,security)) {
+    using(var pipe=new NamedPipeServerStream(pipeName,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous,8192,8192,security)) {
      pipe.WaitForConnection();
      var reader=new StreamReader(pipe,Encoding.UTF8);var writer=new StreamWriter(pipe,new UTF8Encoding(false));writer.AutoFlush=true;
      var read=reader.ReadLineAsync();if(!read.Wait(5000))continue;
      string request=read.Result;if(request==null || request.Length>16000)continue;
      var value=Json.Deserialize<Dictionary<string,object>>(request);Uri uri;
-     if(!value.ContainsKey("id") || !value.ContainsKey("url") || !Uri.TryCreate(Convert.ToString(value["url"]),UriKind.Absolute,out uri) || (uri.Scheme!="https"&&uri.Scheme!="http"))continue;
+     string operation=value.ContainsKey("operation")?Convert.ToString(value["operation"]):"open";
+     if(!value.ContainsKey("id")||(operation!="open"&&operation!="navigate"&&operation!="capabilities"))continue;
+     if(operation!="capabilities"&&(!value.ContainsKey("url") || !Uri.TryCreate(Convert.ToString(value["url"]),UriKind.Absolute,out uri) || (uri.Scheme!="https"&&uri.Scheme!="http")))continue;
      byte[] bytes=Encoding.UTF8.GetBytes(request);byte[] length=BitConverter.GetBytes(bytes.Length);output.Write(length,0,4);output.Write(bytes,0,bytes.Length);output.Flush();
      DateTime deadline=DateTime.UtcNow.AddSeconds(7);bool received=false;
      while(DateTime.UtcNow<deadline) {

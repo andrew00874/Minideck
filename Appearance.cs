@@ -26,6 +26,27 @@ namespace MiniDeck {
   static Bitmap LoadImage(){using(Stream stream=typeof(Brand).Assembly.GetManifestResourceStream("MiniDeck.AppImage"))using(Bitmap bitmap=new Bitmap(stream)){return new Bitmap(bitmap);}}
   static Icon Load(){using(Stream stream=typeof(Brand).Assembly.GetManifestResourceStream("MiniDeck.AppIcon"))using(Icon icon=new Icon(stream)){return (Icon)icon.Clone();}}
  }
+ static class EngineIcons {
+  static readonly Dictionary<string,Bitmap> cache=new Dictionary<string,Bitmap>();
+  public static string For(TextEngine engine){
+   Uri url;if(engine==null||!Uri.TryCreate(engine.Url,UriKind.Absolute,out url))return "search";
+   switch(url.Host.ToLowerInvariant()){
+    case "google.com":case "www.google.com":return "google";
+    case "translate.google.com":return "translate";
+    case "naver.com":case "www.naver.com":case "search.naver.com":return "naver";
+    case "bing.com":case "www.bing.com":return "bing";
+    default:return "search";
+   }
+  }
+  public static Bitmap Get(string name){
+   Bitmap icon;if(cache.TryGetValue(name,out icon))return icon;
+   using(Stream source=typeof(EngineIcons).Assembly.GetManifestResourceStream("MiniDeck.Engine."+name+".svg")){
+    if(source==null)throw new InvalidOperationException("Missing bundled engine icon: "+name);
+    icon=IconStore.DecodeSvg(source);
+   }
+   cache[name]=icon;return icon;
+  }
+ }
  class DarkComboBox : ComboBox {
   public DarkComboBox(){SetStyle(ControlStyles.UserPaint|ControlStyles.OptimizedDoubleBuffer,true);}
   protected override void OnPaint(PaintEventArgs e){
@@ -53,18 +74,21 @@ namespace MiniDeck {
    FileInfo file=new FileInfo(path);if(!file.Exists || file.Length>4*1024*1024)throw new Exception(L10n.T("4MB 이하 PNG 또는 SVG 파일을 선택하세요."));
    string ext=Path.GetExtension(path).ToLowerInvariant();
    if(ext==".svg") {
+    using(Stream input=File.OpenRead(path))return DecodeSvg(input);
+   }
+   if(ext!=".png")throw new Exception(L10n.T("PNG 또는 SVG 파일만 지원합니다."));
+   using(Image input=Image.FromFile(path)) {if(input.Width>4096||input.Height>4096)throw new Exception(L10n.T("4096px 이하 이미지를 선택하세요."));return Normalize(input);}
+  }
+  public static Bitmap DecodeSvg(Stream input){
     SvgDocument.ResolveExternalXmlEntites=ExternalType.None;SvgDocument.ResolveExternalImages=ExternalType.None;SvgDocument.ResolveExternalElements=ExternalType.None;
     XmlReaderSettings settings=new XmlReaderSettings {DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null,MaxCharactersInDocument=4*1024*1024};
-    using(XmlReader reader=XmlReader.Create(path,settings)) {
+    using(XmlReader reader=XmlReader.Create(input,settings)) {
      SvgDocument doc=SvgDocument.Open<SvgDocument>(reader);
      if(doc==null)throw new Exception(L10n.T("SVG 문서를 읽을 수 없습니다."));
      SizeF size=doc.GetDimensions();if(size.Width<=0||size.Height<=0)throw new Exception(L10n.T("SVG에 viewBox 또는 크기가 필요합니다."));
      float scale=256f/Math.Max(size.Width,size.Height);
      using(Bitmap rendered=doc.Draw(Math.Max(1,(int)(size.Width*scale)),Math.Max(1,(int)(size.Height*scale)))) {if(rendered==null)throw new Exception(L10n.T("SVG를 표시할 수 없습니다."));return Normalize(rendered);}
     }
-   }
-   if(ext!=".png")throw new Exception(L10n.T("PNG 또는 SVG 파일만 지원합니다."));
-   using(Image input=Image.FromFile(path)) {if(input.Width>4096||input.Height>4096)throw new Exception(L10n.T("4096px 이하 이미지를 선택하세요."));return Normalize(input);}
   }
   static Bitmap Normalize(Image input) {
    Bitmap result=new Bitmap(256,256);using(Graphics g=Graphics.FromImage(result)) {

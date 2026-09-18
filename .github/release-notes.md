@@ -1,33 +1,30 @@
-MiniDeck is a circular Windows app launcher for a three-key macro pad with a pressable dial.
+MiniDeck 0.2.0-beta.1 adds three modes to the circular dial.
 
-### Fixed in beta.2 / 수정 사항
+- **Key 1 — Saved apps:** open registered apps, folders and websites.
+- **Key 2 — Open windows:** switch between existing windows without starting another app instance.
+- **Key 3 — Text actions:** select text, choose a search/translation engine, then press the knob to open the result. Cancelling sends nothing.
+- Google, Naver, Bing and Google Translate SVG logos are bundled for offline display in the dial and engine settings.
 
-Website selection now brings Chrome to the foreground before selecting the destination tab. Previously, the tab could change while Chrome stayed behind another app. Existing-tab switching and foreground activation were confirmed on a Windows/Chrome installation. No extension reload or reinstall is needed.
+**1번 등록한 앱 / 2번 열린 창 / 3번 선택한 글 검색·번역**으로 구성했습니다. 기존 여섯 단축키 매핑은 그대로 사용합니다. Google·네이버·Bing 검색과 Google 번역을 제공하며 설정에서 엔진 주소를 편집할 수 있습니다.
 
-웹사이트 선택 시 탭만 바뀌고 Chrome이 뒤에 남던 문제를 수정했습니다. 실제 환경에서 Chrome이 앞으로 올라오는 동작을 확인했습니다. 확장 재설치나 새로고침 없이 MiniDeck만 업데이트하면 됩니다.
+### Upgrade / 업데이트
+
+Replace both executables and the extension folder, then reload **MiniDeck Browser Link** at chrome://extensions. Version 1.1.0 adds session storage for engine-specific result-tab IDs and origins; selected text is not stored there. Search actions update their dedicated result tab; ordinary website entries keep their current page.
+
+실행 파일 두 개와 확장 폴더를 교체한 뒤 Chrome에서 MiniDeck 확장을 새로고침하세요. 앱 목록·아이콘·다이얼 위치와 크기는 유지됩니다. 기존 키별 직접 실행 설정은 세 모드로 대체됩니다.
 
 ### Downloads / 다운로드
 
-- **English:** `MiniDeck-0.1.0-beta.2-win-en.zip`
-- **한국어:** `MiniDeck-0.1.0-beta.2-win-ko.zip`
-- `SHA256SUMS.txt` contains the checksums for both ZIP files.
+- English: MiniDeck-0.2.0-beta.1-win-en.zip
+- 한국어: MiniDeck-0.2.0-beta.1-win-ko.zip
+- SHA256SUMS.txt
 
-Extract the entire archive and run **MiniDeck.exe**. Keep the DLLs and `fonts` folder together. Requires Windows 10/11 and .NET Framework 4.8+. Both language editions share settings; run one at a time.
+Extract the entire ZIP and run **MiniDeck.exe**. Windows 10/11 and .NET Framework 4.8+ are required. Keep the DLLs and fonts together; run one language edition at a time.
 
-압축 전체를 풀고 **MiniDeck.exe**를 실행하세요. DLL과 `fonts` 폴더를 함께 유지해야 합니다. 한국어판·영문판은 설정을 공유하므로 하나씩 실행하세요.
+### Validation
 
-### Included
+Both language builds passed 15 self-test groups. Checks cover legacy settings, text encoding, selection from a real Windows text control, explicit confirmation/cancellation, closed-window rejection, existing dial behavior, browser routing and isolated native messaging. Both language previews were visually checked.
 
-- Smooth circular dial with animated selection, saved position and adjustable size.
-- Custom PNG/SVG icons, modern bundled fonts and full wrapped app names.
-- Three shortcut keys, rotary navigation and tray/startup options.
-- Onboard mapping editor for the identified `1189:8890`, Report ID 3 protocol.
-- Chrome Browser Link extension for reusing an existing website tab. One-time unpacked extension setup is required; see `browser-extension/README.md`.
+The connected-device text-selection → key 3 → engine → knob press → result-page flow was confirmed by the user. Existing website-tab activation and Chrome foreground behavior were confirmed earlier. Broader app compatibility, elevated windows, mixed DPI and onboard write persistence remain unverified. Builds are unsigned and global shortcuts respond to any keyboard.
 
-### Beta validation limits
-
-Both language builds passed the app self-tests. English UI previews were reviewed. Browser routing and local native-message transport tests passed. A clean source checkout was built successfully.
-
-Existing-tab switching and foreground activation were confirmed in Chrome on Windows. Broader browser scenarios and onboard write persistence need further validation. Global shortcuts currently respond to any keyboard. Similar-looking macro pads may use different hardware/protocols. Builds are unsigned.
-
-Personal settings, original manufacturer software and hardware investigation files are excluded.
+Personal settings, manufacturer software and hardware investigation files are excluded.

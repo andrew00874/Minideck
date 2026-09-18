@@ -14,6 +14,26 @@ namespace MiniDeck {
  static class BrowserLink {
   static readonly HashSet<string> Pending = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
   public static string PipeName { get { return "MiniDeck.Browser." + WindowsIdentity.GetCurrent().User.Value; } }
+  public static async void Navigate(string url,string engineId){
+   string pending="text:"+engineId;if(!Pending.Add(pending))return;
+   try{
+    // Probe without the selected text. Old hosts/extensions fail closed, so they
+    // cannot mistake this action for ordinary same-origin website activation.
+    var capability=await Task.Factory.StartNew(()=>Exchange(new {id=Guid.NewGuid().ToString("N"),operation="capabilities"},false));
+    if(!capability.ContainsKey("navigate")||!Convert.ToBoolean(capability["navigate"]))throw new Exception("Unsupported browser extension");
+    await Task.Factory.StartNew(()=>Exchange(new{id=Guid.NewGuid().ToString("N"),operation="navigate",url=url,engine=engineId},true));
+   }catch(Exception){MessageBox.Show(L10n.T("검색 결과를 열지 못했습니다. Chrome의 MiniDeck 확장을 새로고침하고 다시 시도해 주세요.\n확장과 MiniDeck.BrowserHost.exe가 모두 최신 버전이어야 합니다. 중복 탭은 열지 않았습니다."),"MiniDeck",MessageBoxButtons.OK,MessageBoxIcon.Information);}
+   finally{Pending.Remove(pending);}
+  }
+  static Dictionary<string,object> Exchange(object request,bool foreground){
+   using(var pipe=new NamedPipeClientStream(".",PipeName,PipeDirection.InOut,PipeOptions.Asynchronous)){
+    pipe.Connect(1200);if(foreground)BrowserForeground.Prepare(pipe);
+    var serializer=new JavaScriptSerializer();var writer=new StreamWriter(pipe,new UTF8Encoding(false)){AutoFlush=true};var reader=new StreamReader(pipe,Encoding.UTF8);
+    writer.WriteLine(serializer.Serialize(request));var read=reader.ReadLineAsync();if(!read.Wait(8000)||read.Result==null)throw new IOException("Browser request failed");
+    var result=serializer.Deserialize<Dictionary<string,object>>(read.Result);
+    if(!result.ContainsKey("ok")||!Convert.ToBoolean(result["ok"]))throw new IOException("Browser action failed");return result;
+   }
+  }
   public static bool Open(string target) {
    Uri url;
    if(!Uri.TryCreate(target,UriKind.Absolute,out url) || (url.Scheme!="https" && url.Scheme!="http")) return false;
