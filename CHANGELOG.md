@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Select text and press key 3 to translate immediately with Ollama or LM Studio on this PC. A nonmodal MiniDeck window shows the source, progress, and translation without an engine-selection or knob-confirmation step.
+- Added local connection, installed-model selection and target-language settings. Immediate local translation is enabled by default; disable it to restore the existing web text-action dial. Models must be installed separately, and the existing 0.2.0-beta.1 downloads do not include this feature.
+- The result window supports copying, retrying and opening settings. Closing it or pressing Esc cancels the request; a new selection replaces the previous request and result.
+- Local translation accepts loopback servers only and does not need Chrome Browser Link or fall back to cloud services. MiniDeck keeps source text and translations in memory only; the model server manages its own logs and caches.
+
 ## 0.2.0-beta.1
 
 - Key 1 opens saved apps, key 2 switches between existing windows, and key 3 searches/translates selected text through the dial. Existing six hardware mappings stay the same.
@@ -27,3 +34,4 @@
 - Optional Chrome Browser Link: reuse an existing same-origin tab without navigating or reloading; open a tab only if no match exists.
 
 This is a beta. Protocol encoding and UI tests are automated. Onboard write persistence and a real Chrome-extension round trip still require hardware/browser validation; this release does not claim universal support for visually similar mini keyboards.
+

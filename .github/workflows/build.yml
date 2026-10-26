@@ -28,6 +28,22 @@ jobs:
           $version = '0.2.0-beta.1'
           if ($env:GITHUB_REF_TYPE -eq 'tag') { $version = $env:GITHUB_REF_NAME.Substring(1) }
           ./scripts/package.ps1 -Version $version
+      - name: Test local translation protocols and cancellation
+        shell: pwsh
+        run: |
+          foreach ($language in @('ko','en')) {
+            $binary = Get-ChildItem artifacts -Filter MiniDeck.exe -Recurse | Where-Object { $_.Directory.Name -like "MiniDeck-*-win-$language" } | Select-Object -First 1
+            if (!$binary) { throw "Missing $language test executable" }
+            $output = Join-Path $PWD "artifacts/translation-tests-$language"
+            $process = Start-Process -FilePath $binary.FullName -ArgumentList @('--translation-test', "`"$output`"") -PassThru
+            if (!$process.WaitForExit(60000)) { $process.Kill(); throw 'Translation tests timed out' }
+            Get-Content (Join-Path $output 'translation-tests.txt')
+            if ($process.ExitCode -ne 0) { throw "Translation tests failed ($language)" }
+            $process = Start-Process -FilePath $binary.FullName -ArgumentList @('--translation-ui-test', "`"$output`"") -PassThru
+            if (!$process.WaitForExit(60000)) { $process.Kill(); throw 'Translation UI tests timed out' }
+            Get-Content (Join-Path $output 'translation-ui-tests.txt')
+            if ($process.ExitCode -ne 0) { throw "Translation UI tests failed ($language)" }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: MiniDeck-windows-ko-en
@@ -52,3 +68,4 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           gh release create "$RELEASE_TAG" dist/* --verify-tag --prerelease --title "MiniDeck $RELEASE_TAG" --notes-file .github/release-notes.md
+

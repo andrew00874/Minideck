@@ -15,7 +15,8 @@ Keep your favorite apps, folders and websites on one dial. Turn the knob to move
 | Feature | How you use it |
 | --- | --- |
 | Circular app selection | Rotate through icons; the selected icon grows and appears in the center. |
-| Three dial modes | Key 1: saved apps. Key 2: open windows. Key 3: selected-text actions. |
+| Three key modes | Key 1: saved apps. Key 2: open windows. Key 3: translate selected text locally, or choose web text actions. |
+| Local translation (current source) | Select text and press key 3 to read the translation in a MiniDeck window, using Ollama or LM Studio on this PC. |
 | Position and size | Drag the dial anywhere; choose a diameter from 280 to 560 px. Both are saved. |
 | Custom icons | Import a PNG or SVG with transparency and preview it before saving. |
 | Full app names | Names wrap instead of ending in an ellipsis; very long names can be scrolled. |
@@ -26,6 +27,8 @@ Keep your favorite apps, folders and websites on one dial. Turn the knob to move
 ## Download and quick start
 
 **New in 0.2.0-beta.1:** three dial modes and service SVG icons. When upgrading, replace both executables and reload Browser Link 1.1.0 in Chrome.
+
+**The local translation feature described below is in the current source and is not included in the 0.2.0-beta.1 downloads.** Build this source to use it. Those downloads continue to open the web text-action dial with key 3.
 
 | Edition | Download |
 | --- | --- |
@@ -48,7 +51,7 @@ Both language editions share settings. Run only one at a time; switching edition
 
 The left list is the dial's order. Select an item to edit its name, target or icon. **Move up / Move down** changes the order; the app dial follows that order. **Remove** removes the launcher entry, not the installed app.
 
-Use **1 Saved apps** for launch targets, **2 Open windows** to switch between existing windows without launching an app, and **3 Text actions** for the text workflow below. **Open selected** still tests an app launch.
+Use **1 Saved apps** for launch targets, **2 Open windows** to switch between existing windows without launching an app, and key 3 for the text workflow below. In the current source, **3 Local translation** translates immediately by default; disable that option in **Local translation settings** to use the web text-action dial. **Open selected** still tests an app launch.
 
 Launch targets can be executables, shortcuts, folders or web URLs. For example:
 
@@ -116,9 +119,24 @@ Different subdomains, other Chrome profiles, other browsers and incognito tabs a
 
 See [the full extension guide](browser-extension/README.md). The extension uses tab metadata and a local native-messaging connection. It does not scrape page contents, cookies or passwords. In text mode, confirming an engine navigates to its result URL with your selection. It is loaded unpacked, not from the Chrome Web Store. **Existing-tab switching and bringing Chrome to the foreground have been confirmed on a Windows/Chrome installation. Other browser scenarios still need broader testing.**
 
-## Search and translate selected text
+## Translate selected text locally
+
+This workflow is available when building the current source. It uses a model server on your PC and does not require Chrome Browser Link or an API key.
+
+1. Install and start **Ollama** or **LM Studio**, then download a model that supports the languages you need. MiniDeck does not install or download models. For example, with Ollama you can run `ollama pull qwen3:4b`; model speed and translation quality depend on the model and your PC.
+2. Open **Local translation settings** in MiniDeck Settings. Choose **Ollama** with `http://127.0.0.1:11434`, or **LM Studio (OpenAI API)** with `http://127.0.0.1:1234` and start its local server. Enter the server's root URL; MiniDeck adds the API path.
+3. Click **Load models** and select an installed model, or enter its exact model ID. The model setting starts empty. Choose a target language (Korean in the KO edition, English in the EN edition) and save with **Translate locally when key 3 is pressed** enabled.
+4. Drag to select text in the app you are using, press **key 3**, then release the keys. MiniDeck opens a result window and translates the selection immediately; no engine choice or knob press is needed.
+
+The result window shows the original text, progress, and the translation or a useful error. You can copy the translation, retry, or open connection settings. It stays open until you close it. **Esc** or closing the window cancels the current request and clears the displayed text; selecting new text and pressing key 3 cancels the previous request and replaces its result.
+
+Only loopback server addresses are accepted. MiniDeck does not fall back to a cloud service if the server is unavailable. Original text and results are held in memory, not saved to MiniDeck settings or logs. Your chosen local server can have its own logging or caching behavior.
+
+## Use web search and translation
 
 ![Text action dial showing an engine and a sample selection](docs/images/text-en.png)
+
+In the current source, disable immediate translation in **Local translation settings** to return key 3 to this workflow. The 0.2.0-beta.1 downloads use this workflow by default. Chrome Browser Link is required for these web actions and for website entries.
 
 1. Select text in the app you are using.
 2. Press **key 3**, then release the keys. MiniDeck reads the selection before showing the dial.
@@ -129,7 +147,9 @@ No API key is needed. **Text engines** in Settings lets you add/edit a display n
 
 **Update Browser Link to 1.1.0:** replace both app/host files and the extension folder, then reload MiniDeck Browser Link at `chrome://extensions`. Text actions use a separate result tab per engine and update its query. Ordinary website entries continue to preserve existing pages. Result-tab tracking resets when Chrome or the extension restarts; a new result tab is then created.
 
-Selection is held only in memory and cleared when dismissed; MiniDeck does not save it to settings or logs. The confirmed URL can appear in browser history and is received by the selected service. Capture first uses Windows UI Automation, then falls back to Ctrl+C while preserving the clipboard where possible. Some apps copy a line when nothing is selected, so check the preview. Empty, unavailable or overlong selections are rejected (2,000 characters; encoded URLs also have a limit). Elevated/protected apps may deny capture. The connected-device selection → key 3 → engine → knob press → result-page flow was confirmed by the user. Compatibility with other apps and elevated windows still needs broader testing.
+For web actions, selection is held only in memory and cleared when dismissed; MiniDeck does not save it to settings or logs. The confirmed URL can appear in browser history and is received by the selected service.
+
+Both text workflows capture the selection with Windows UI Automation first, then fall back to Ctrl+C while preserving the clipboard where possible. Some apps copy a line when nothing is selected, so check the original text. Empty, unavailable or overlong selections are rejected (2,000 characters; web actions also limit encoded URL length). Elevated/protected apps may deny capture. The connected-device selection → key 3 → engine → knob press → web-result flow was confirmed by the user. Local translation on a real Windows PC, compatibility with other apps, and elevated windows still need broader testing.
 
 ## 5. Save mappings to a supported keyboard
 
@@ -165,13 +185,14 @@ Settings are saved in `%APPDATA%\MiniDeck\settings.json`, with the previous save
 | Another MiniDeck is already running | Open its tray icon; quit it before switching language editions. |
 | Shortcuts do nothing | Check the status line for conflicts and verify the keyboard's six mappings. |
 | Browser Link is disconnected | Open Chrome, enable the extension and click its icon. Rerun setup after moving MiniDeck. |
+| Local translation cannot connect | Start Ollama or LM Studio's local server, check its root URL in Local translation settings, refresh the model list, and select an installed model. Browser Link is not used for local translation. |
 | Keyboard is not detected | Connect only one supported device; check its protocol, not just its appearance. |
 | An installed app opens again | Existing-window reuse is limited to absolute-path EXEs without arguments and can fall back to launching if activation fails. |
 | The app fails after being copied | Extract all DLLs and the `fonts` folder; check .NET Framework 4.8 is installed. |
 
 ## Beta status
 
-Both language builds passed the app self-tests; English screens were visually reviewed. Automated checks cover settings migration, selection capture, confirmation/cancellation, window lifetime checks, global hotkeys, dial navigation/drag/size, long captions, icon import, onboard packet encoding, translation coverage, browser routing and the local native-message transport.
+The 0.2.0-beta.1 language builds passed the app self-tests; English screens were visually reviewed. Those automated checks cover settings migration, selection capture, confirmation/cancellation, window lifetime checks, global hotkeys, dial navigation/drag/size, long captions, icon import, onboard packet encoding, translation coverage, browser routing and the local native-message transport. The current source adds local translation; previous release validation does not establish real-model performance or Windows UI compatibility for this feature.
 
 These checks do **not** prove onboard write persistence or compatibility with every mini keyboard. Existing-tab switching and foreground activation were also confirmed in Chrome on Windows. Other browser scenarios, elevated apps and mixed-DPI displays need further validation. Desktop apps outside the limited reuse case follow their normal launch behavior.
 
@@ -206,3 +227,4 @@ Self-tests use isolated settings. Preview mode uses sample entries; the screensh
 Bundled library and font notices are in [THIRD-PARTY.md](THIRD-PARTY.md), `licenses/` and `fonts/`. Original manufacturer executables and decompiled vendor code are not included. No project-wide open-source license has been selected yet; third-party components retain their own licenses.
 
 Last reviewed: 2026-09-18 · Version: 0.2.0-beta.1
+
