@@ -133,7 +133,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-local-transl
 
 The setup downloads the official **Tencent Hy-MT2 7B Q4_K_M** translation weights (about 4.6GB) and **llama.cpp b11960 Windows Vulkan** runtime, with pinned revisions and SHA-256 verification. The model supports 33 languages, including Korean. Files and license texts stay under `%LOCALAPPDATA%\MiniDeck\translation`. Existing apps, key assignments and dial placement are preserved. A working Vulkan GPU is required; initialization failures are shown instead of silently switching to CPU.
 
-Start MiniDeck, select text and press **key 3**. MiniDeck starts its server hidden on the first translation. The model sleeps after five idle minutes and prepares again on the next request. Exiting MiniDeck also stops the server it started. Change the target language under **Local translation settings**; defaults are Korean in the KO edition and English in the EN edition.
+Start MiniDeck, select text and press **key 3**. MiniDeck prepares its installed model in the background at startup. The model sleeps after 15 idle minutes and prepares again on the next request; it occupies GPU memory while loaded. Exiting MiniDeck also stops the server it started. Change the target language under **Local translation settings**; defaults are Korean in the KO edition and English in the EN edition.
 
 For the smaller **Hy-MT2 1.8B Q8_0** model (about 1.9GB), add `-ModelSize Faster` to the setup command. It is faster, but mistranslated a technical term in the reviewed examples, so 7B is the default. Speed and quality depend on your selection and hardware.
 
@@ -141,7 +141,7 @@ For the smaller **Hy-MT2 1.8B Q8_0** model (about 1.9GB), add `-ModelSize Faster
 
 You can also use **Ollama**, **LM Studio**, or another OpenAI-compatible local server. Open **Local translation settings**, enter its root URL, and click **Load models** to select an installed model. Defaults are `http://127.0.0.1:11434` for Ollama and `http://127.0.0.1:1234` for LM Studio. MiniDeck adds the API path. The model starts empty if the recommended installation is absent.
 
-Select text → press **key 3** → review the source, progress and translation in MiniDeck. No engine selection or knob confirmation is needed. Copy, retry and connection settings are available in the result window. A new selection cancels and replaces the previous request. **Esc** or closing cancels and clears the displayed text.
+Select text → press **key 3** → review the source, progress and translation in MiniDeck. No engine selection or knob confirmation is needed. Generated text appears immediately; copying stays disabled until completion. Copy, retry and connection settings are available in the result window. A new selection cancels and replaces the previous request. **Esc** or closing cancels and clears the displayed text.
 
 There is no shared 2,000-character cap. Local translation splits selections of up to 50,000 characters into lines and bounded chunks while preserving original line breaks. Output-limit truncation is reported as an error rather than a completed translation. Long text requires multiple inference requests and can be cancelled.
 
@@ -239,5 +239,5 @@ Self-tests use isolated settings. Preview mode uses sample entries; the screensh
 
 Bundled library and font notices are in [THIRD-PARTY.md](THIRD-PARTY.md), `licenses/` and `fonts/`. Original manufacturer executables and decompiled vendor code are not included. No project-wide open-source license has been selected yet; third-party components retain their own licenses.
 
-Last reviewed: 2026-10-29 · Current source: 0.3.0-beta.1 (separate from the existing release)
+Last reviewed: 2026-10-29 · Current source: 0.3.0-beta.2 (separate from the existing release)
 

@@ -364,6 +364,7 @@ namespace MiniDeck {
   Settings data; Overlay overlay; NotifyIcon tray; ListBox apps=new ListBox(); Button[] modeButtons=new Button[3];
   DialMode mode=DialMode.Apps;int[] selections=new int[3];int captureVersion;bool capturing;
   TranslationResultForm translationResult;
+  System.Threading.CancellationTokenSource modelWarmup;
   Label status=new Label(); bool exiting; bool escapeRegistered; List<int> registered=new List<int>();
   public MainForm(Settings settings) {
    Icon=Brand.Icon;
@@ -421,6 +422,13 @@ namespace MiniDeck {
   void ButtonAt(string text,int x,int y,Action action) { Button b=new Button {Text=text,Left=x,Top=y,Width=150,Height=35}; b.Click+=delegate { action(); }; Controls.Add(b); }
   bool HasStartup() { using(RegistryKey k=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) return k!=null && k.GetValue("MiniDeck")!=null; }
   void ShowSettings() { Show(); WindowState=FormWindowState.Normal; Activate(); }
+  public async void PrepareLocalModel(){
+   if(!data.LocalTranslation.Enabled)return;
+   var request=new System.Threading.CancellationTokenSource();modelWarmup=request;
+   try{await LocalModelRuntime.EnsureRunningAsync(data.LocalTranslation,request.Token);}
+   catch(Exception){/* The result window reports setup errors if translation is requested. */}
+   finally{if(modelWarmup==request)modelWarmup=null;request.Dispose();}
+  }
   void EditTranslationSettings() {
    CancelCapture();overlay.Dismiss();
    if(translationResult!=null&&!translationResult.IsDisposed)translationResult.CancelTranslation();
@@ -520,6 +528,7 @@ namespace MiniDeck {
   }
   protected override void OnFormClosing(FormClosingEventArgs e) {
    if(!exiting && e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();return;}
+   if(modelWarmup!=null)modelWarmup.Cancel();
    CancelCapture();overlay.Dismiss(); foreach(int id in registered)Native.UnregisterHotKey(Handle,id);
    if(translationResult!=null&&!translationResult.IsDisposed)translationResult.Close();
    LocalModelRuntime.Stop();overlay.Dispose();tray.Visible=false;tray.Dispose();base.OnFormClosing(e);
@@ -633,6 +642,7 @@ namespace MiniDeck {
      Settings s=(args.Length==2&&args[0]=="--preview")?Storage.Defaults():Storage.Load(); MainForm form=new MainForm(s);
      if(args.Length==2&&args[0]=="--preview"){form.Preview(args[1]);return;}
      if(args.Contains("--background")) form.Shown+=delegate {form.Hide();};
+      form.Shown+=delegate {form.PrepareLocalModel();};
      Application.Run(form);
     } catch(Exception ex) {if(args.Length==2&&(args[0]=="--self-test"||args[0]=="--preview")){File.WriteAllText(Path.Combine(args[1],"diagnostic-error.txt"),ex.ToString());Environment.ExitCode=1;}else MessageBox.Show(L10n.T("MiniDeck 시작 실패\n")+ex.Message);}
    }

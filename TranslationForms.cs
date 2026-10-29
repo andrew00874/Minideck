@@ -83,11 +83,13 @@ namespace MiniDeck {
   LocalTranslationSettings lastSettings;
   string selectedText;
   int version;
+  bool completed;
   public bool IsTranslating {get;private set;}
   public bool HasSelection {get{return !String.IsNullOrWhiteSpace(selectedText);}}
   internal string ResultText {get{return result.Text;}}
   internal string SourceText {get{return source.Text;}}
   internal string StatusText {get{return status.Text;}}
+  internal bool CanCopy {get{return copy.Enabled;}}
   public TranslationResultForm(Action settingsAction){
    openSettings=settingsAction;Text=L10n.T("MiniDeck · 로컬 번역");Icon=Brand.Icon;Font=Typography.Create(10);
    ClientSize=new Size(650,500);MinimumSize=new Size(666,539);StartPosition=FormStartPosition.Manual;
@@ -116,13 +118,13 @@ namespace MiniDeck {
    };
    Theme.Apply(this);SetBusy(false);copy.Enabled=false;retry.Enabled=false;
   }
-  static void ConfigureText(TextBox box){box.Multiline=true;box.ReadOnly=true;box.ScrollBars=ScrollBars.Vertical;box.WordWrap=true;box.TabStop=true;box.ShortcutsEnabled=true;}
+  static void ConfigureText(TextBox box){box.Multiline=true;box.ReadOnly=true;box.MaxLength=1024*1024;box.ScrollBars=ScrollBars.Vertical;box.WordWrap=true;box.TabStop=true;box.ShortcutsEnabled=true;}
   void SetStatus(string text,bool error){status.Text=text;status.ForeColor=error?Color.FromArgb(255,166,166):Theme.Muted;}
-  void SetBusy(bool busy){IsTranslating=busy;copy.Enabled=!busy&&!String.IsNullOrWhiteSpace(result.Text);retry.Enabled=!busy&&HasSelection;stop.Enabled=busy;}
+  void SetBusy(bool busy){IsTranslating=busy;copy.Enabled=!busy&&completed&&!String.IsNullOrWhiteSpace(result.Text);retry.Enabled=!busy&&HasSelection;stop.Enabled=busy;}
   public void BeginTranslation(string text,LocalTranslationSettings settings){
    if(IsDisposed)return;
    CancelActive();int request=version;
-   selectedText=text;lastSettings=(settings??new LocalTranslationSettings()).Clone();source.Text=text??"";result.Clear();
+   completed=false;selectedText=text;lastSettings=(settings??new LocalTranslationSettings()).Clone();source.Text=text??"";result.Clear();
    if(!Visible){
     Rectangle area=Screen.FromPoint(Cursor.Position).WorkingArea;Point cursor=Cursor.Position;
     Location=new Point(Math.Max(area.Left,Math.Min(cursor.X+20,area.Right-Width)),Math.Max(area.Top,Math.Min(cursor.Y+20,area.Bottom-Height)));
@@ -137,11 +139,12 @@ namespace MiniDeck {
   async void RunTranslation(string text,LocalTranslationSettings settings,int request,CancellationTokenSource cancellation){
    try{
     var progress=new Progress<string>(value=>{if(!IsDisposed&&request==version&&IsTranslating)SetStatus(value,false);});
-    string translated=await LocalTranslationClient.TranslateAsync(settings,text,cancellation.Token,progress);
+    var preview=new Progress<string>(value=>{if(!IsDisposed&&request==version&&IsTranslating){if(value.StartsWith(result.Text,StringComparison.Ordinal))result.AppendText(value.Substring(result.Text.Length));else result.Text=value;}});
+    string translated=await LocalTranslationClient.TranslateAsync(settings,text,cancellation.Token,progress,preview);
     if(IsDisposed||request!=version||cancellation.IsCancellationRequested)return;
-    result.Text=translated;SetStatus(L10n.T("번역 완료 · Esc로 닫기"),false);
+    result.Text=translated;completed=true;SetStatus(L10n.T("번역 완료 · Esc로 닫기"),false);
    }catch(OperationCanceledException){if(!IsDisposed&&request==version)SetStatus(L10n.T("번역을 취소했습니다."),false);}
-   catch(Exception ex){if(!IsDisposed&&request==version)SetStatus(ex.Message,true);}
+   catch(Exception ex){if(!IsDisposed&&request==version){result.Clear();SetStatus(ex.Message,true);}}
    finally{
     if(!IsDisposed&&request==version){active=null;SetBusy(false);}
     cancellation.Dispose();
