@@ -200,6 +200,10 @@ namespace MiniDeck {
      }catch(OperationCanceledException){
       token.ThrowIfCancellationRequested();
       throw new TimeoutException(L10n.T("번역 응답이 늦어 중단했습니다. 모델을 준비한 뒤 다시 시도하세요."));
+     }catch(ObjectDisposedException){
+      token.ThrowIfCancellationRequested();
+      if(timeout.IsCancellationRequested)throw new TimeoutException(L10n.T("번역 응답이 늦어 중단했습니다. 모델을 준비한 뒤 다시 시도하세요."));
+      throw new InvalidOperationException(L10n.T("로컬 서버와의 연결이 끊겼습니다. 서버 상태를 확인하고 다시 시도하세요."));
      }catch(IOException){
       token.ThrowIfCancellationRequested();
       if(timeout.IsCancellationRequested)throw new TimeoutException(L10n.T("번역 응답이 늦어 중단했습니다. 모델을 준비한 뒤 다시 시도하세요."));
