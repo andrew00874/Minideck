@@ -17,6 +17,22 @@ namespace MiniDeck {
   public static void Run(){Task.Run((Func<Task>)RunAsync).GetAwaiter().GetResult();}
   // Call on the UI thread after WinForms has installed its synchronization context.
   public static void RunUi(){
+   using(var stream=new Server(200,StreamBody("OpenAI"),contentType:"text/event-stream",pause:true))
+   using(var form=new TranslationResultForm(delegate{})){
+    form.BeginTranslation("live preview sample",Settings(stream.Address,"OpenAI"));
+    PumpUntil(()=>form.ResultText=="안녕😀",3000,"stream preview did not reach the result window before completion");
+    Check(form.IsTranslating&&!form.CanCopy,"partial output was marked as complete");
+    form.CancelTranslation();stream.Resume.Set();Application.DoEvents();
+    Check(!form.IsTranslating&&!form.CanCopy,"cancelled partial translation was copyable as a completed result");
+    form.Close();
+   }
+   using(var stream=new Server(200,StreamBody("OpenAI","length"),contentType:"text/event-stream",pause:true))
+   using(var form=new TranslationResultForm(delegate{})){
+    form.BeginTranslation("incomplete preview sample",Settings(stream.Address,"OpenAI"));
+    PumpUntil(()=>form.ResultText=="안녕😀",3000,"incomplete-stream preview did not appear");stream.Resume.Set();
+    PumpUntil(()=>!form.IsTranslating,3000,"incomplete stream remained busy");
+    Check(form.ResultText==""&&!form.CanCopy,"incomplete stream retained a completed result");form.Close();
+   }
    string newest="private latest selection 4219",translation="Latest translation 4219";
    using(var oldServer=new Server(200,"",null,true))
    using(var nextServer=new Server(200,"{\"message\":{\"content\":\""+translation+"\"}}"))
@@ -38,9 +54,9 @@ namespace MiniDeck {
     retrySettings.Provider="OpenAI";retrySettings.BaseUrl=retryServer.Address;retrySettings.Model="retry-model";
     form.RetryWithSettings(retrySettings);
     PumpUntil(()=>!form.IsTranslating,5000,"retry with updated settings did not complete");
-    Check(form.ResultText=="Retried translation 4219"&&form.SourceText==newest,"retry did not reuse the selected text with updated settings");
+    Check(form.ResultText=="Retried translation 4219"&&form.SourceText==newest,"retry did not reuse the selected text with updated settings; result="+form.ResultText+"; source="+form.SourceText+"; status="+form.StatusText);
     Check(retryServer.Received.IsCompleted&&!retryServer.Received.IsFaulted,"retry did not use the new endpoint");
-    CheckTranslationRequest(retryServer.Received.GetAwaiter().GetResult(),"/v1/chat/completions",newest,"retry-model");
+    CheckTranslationRequest(retryServer.Received.GetAwaiter().GetResult(),"/v1/chat/completions",newest,"retry-model",true);
     Check(nextSettings.Provider=="Ollama"&&nextSettings.BaseUrl==nextServer.Address&&nextSettings.Model=="test-model","retry mutated the original settings snapshot");
     string after=new JavaScriptSerializer().Serialize(persisted);
     Check(before==after&&!after.Contains(newest)&&!after.Contains(translation),"selection or result leaked into persistent settings");
@@ -79,12 +95,12 @@ namespace MiniDeck {
    Check(failed,message);
   }
   static Dictionary<string,object> Json(string body){return (Dictionary<string,object>)new JavaScriptSerializer().DeserializeObject(body);}
-  static void CheckTranslationRequest(Request request,string path,string sample,string requestedModel="test-model"){
+  static void CheckTranslationRequest(Request request,string path,string sample,string requestedModel="test-model",bool streaming=false){
    Check(request.Method=="POST"&&request.Path==path,"incorrect translation route");
    Check(request.Headers.IndexOf("application/json",StringComparison.OrdinalIgnoreCase)>=0,"missing JSON content type");
    Dictionary<string,object> body=Json(request.Body);
    Check((string)body["model"]==requestedModel,"model was not passed through");
-   Check(body.ContainsKey("stream")&&body["stream"] is bool&&!(bool)body["stream"],"translation must request a complete JSON response");
+   Check(body.ContainsKey("stream")&&body["stream"] is bool&&(bool)body["stream"]==streaming,"unexpected translation streaming mode");
    object[] messages=(object[])body["messages"];
    Check(messages.Length>=2,"missing translation instruction or source");
    Dictionary<string,object> instruction=(Dictionary<string,object>)messages[0];
@@ -93,6 +109,7 @@ namespace MiniDeck {
    Check((string)source["role"]=="user"&&(string)source["content"]==sample,"selected text changed during JSON encoding");
   }
   static async Task RunAsync(){
+   await TestStreaming();
    string sample="Selected \"text\" & \uD55C\uAE00 \\ end";
    foreach(string provider in new[]{"Ollama","OpenAI"}){
     string response=provider=="Ollama"?"{\"message\":{\"content\":\"Bonjour\\nmonde\"}}":"{\"choices\":[{\"message\":{\"content\":\"Bonjour\\nmonde\"}}]}";
@@ -177,24 +194,60 @@ namespace MiniDeck {
    }
   }
   sealed class Request {public string Method,Path,Headers,Body;}
+  sealed class ImmediateProgress:IProgress<string> {
+   readonly Action<string> update;public ImmediateProgress(Action<string> action){update=action;}
+   public void Report(string text){update(text);}
+  }
+  static string StreamBody(string provider,string reason="stop",bool terminal=true){
+   if(provider=="Ollama")return "{\"message\":{\"content\":\"안녕😀\"},\"done\":false}\n{\"message\":{\"content\":\"세계\"},\"done\":false}\n"+(terminal?"{\"done\":true,\"done_reason\":\""+reason+"\"}\n":"");
+   return "data: {\"choices\":[{\"delta\":{\"content\":\"안녕😀\"},\"finish_reason\":null}]}\n\n"+
+    "data: {\"choices\":[{\"delta\":{\"content\":\"세계\"},\"finish_reason\":\""+reason+"\"}]}\n\n"+(terminal?"data: [DONE]\n\n":"");
+  }
+  static async Task TestStreaming(){
+   foreach(string provider in new[]{"Ollama","OpenAI"}){
+    string type=provider=="Ollama"?"application/x-ndjson":"text/event-stream";
+    using(var server=new Server(200,StreamBody(provider),contentType:type,pause:true)){
+     var first=new TaskCompletionSource<string>();var preview=new ImmediateProgress(text=>first.TrySetResult(text));
+     Task<string> pending=LocalTranslationClient.TranslateAsync(Settings(server.Address,provider),"sample",CancellationToken.None,null,preview);
+     Check(await Task.WhenAny(first.Task,Task.Delay(3000))==first.Task,"partial translation was buffered until completion");
+     Check(!pending.IsCompleted&&first.Task.Result=="안녕😀","first output arrived only after terminal response or lost Unicode");
+     server.Resume.Set();string result=await pending;
+     Check(result=="안녕😀세계","streamed translation was not assembled correctly");
+     CheckTranslationRequest(await server.Received,provider=="Ollama"?"/api/chat":"/v1/chat/completions","sample",streaming:true);
+    }
+    foreach(string body in new[]{StreamBody(provider,"length"),StreamBody(provider,terminal:false)})
+     using(var server=new Server(200,body,contentType:type))
+      await MustFail(async delegate{await LocalTranslationClient.TranslateAsync(Settings(server.Address,provider),"sample",CancellationToken.None,null,new ImmediateProgress(text=>{}));},"incomplete stream reported as completed translation");
+    using(var server=new Server(200,StreamBody(provider),contentType:type,pause:true))using(var cancellation=new CancellationTokenSource()){
+     var first=new TaskCompletionSource<string>();
+     Task<string> pending=LocalTranslationClient.TranslateAsync(Settings(server.Address,provider),"sample",cancellation.Token,null,new ImmediateProgress(text=>first.TrySetResult(text)));
+     Check(await Task.WhenAny(first.Task,Task.Delay(3000))==first.Task,"stream cancellation test did not receive preview");
+     cancellation.Cancel();Check(await Task.WhenAny(pending,Task.Delay(3000))==pending,"stream cancellation did not abort read");
+     bool cancelled=false;try{await pending;}catch(OperationCanceledException){cancelled=true;}Check(cancelled,"stream cancellation was not propagated");
+    }
+   }
+   using(var server=new Server(200,"data: "+new string('x',131073)+"\n\n",contentType:"text/event-stream"))
+    await MustFail(async delegate{await LocalTranslationClient.TranslateAsync(Settings(server.Address,"OpenAI"),"sample",CancellationToken.None,null,new ImmediateProgress(text=>{}));},"unbounded stream frame accepted");
+  }
   sealed class Server:IDisposable {
    readonly TcpListener listener;readonly Task worker;readonly TaskCompletionSource<Request> received=new TaskCompletionSource<Request>();
    TcpClient client;
    public readonly string Address;
    public readonly List<Request> Requests=new List<Request>();
+   public readonly ManualResetEventSlim Resume=new ManualResetEventSlim(false);
    public Task<Request> Received {get{return received.Task;}}
    public Task Completion {get{return worker;}}
-   public Server(int status,string body,string redirect=null,bool hold=false){
+   public Server(int status,string body,string redirect=null,bool hold=false,string contentType="application/json",bool pause=false){
     listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
     Address="http://127.0.0.1:"+((IPEndPoint)listener.LocalEndpoint).Port;
-    worker=Task.Run(delegate{Serve(status,body,redirect,hold);});
+    worker=Task.Run(delegate{Serve(status,body,redirect,hold,contentType,pause);});
    }
    public Server(string[] bodies){
     listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
     Address="http://127.0.0.1:"+((IPEndPoint)listener.LocalEndpoint).Port;
     worker=Task.Run(delegate{foreach(string body in bodies)Serve(200,body,null,false);});
    }
-   void Serve(int status,string body,string redirect,bool hold){
+   void Serve(int status,string body,string redirect,bool hold,string contentType="application/json",bool pause=false){
     try{
      client=listener.AcceptTcpClient();client.ReceiveTimeout=5000;client.SendTimeout=5000;
      using(NetworkStream stream=client.GetStream()){
@@ -211,13 +264,18 @@ namespace MiniDeck {
       Requests.Add(request);received.TrySetResult(request);
       if(hold){while(stream.ReadByte()!=-1){}return;}
       byte[] payload=Encoding.UTF8.GetBytes(body);
-      string response="HTTP/1.1 "+status+" Test\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: "+payload.Length+"\r\nConnection: close\r\n"+(redirect==null?"":"Location: "+redirect+"\r\n")+"\r\n";
-      byte[] responseHeaders=Encoding.ASCII.GetBytes(response);stream.Write(responseHeaders,0,responseHeaders.Length);stream.Write(payload,0,payload.Length);stream.Flush();
+      string response="HTTP/1.1 "+status+" Test\r\nContent-Type: "+contentType+"; charset=utf-8\r\nContent-Length: "+payload.Length+"\r\nConnection: close\r\n"+(redirect==null?"":"Location: "+redirect+"\r\n")+"\r\n";
+      byte[] responseHeaders=Encoding.ASCII.GetBytes(response);stream.Write(responseHeaders,0,responseHeaders.Length);
+      int split=pause?Encoding.UTF8.GetByteCount(body.Substring(0,body.IndexOf('\n')+1)):payload.Length;
+      // SSE needs its blank line before a complete first event can be observed.
+      if(pause&&contentType=="text/event-stream")split++;
+      stream.Write(payload,0,split);stream.Flush();if(pause)Resume.Wait(5000);
+      if(split<payload.Length){stream.Write(payload,split,payload.Length-split);stream.Flush();}
      }
     }catch(Exception ex){received.TrySetException(ex);}
    }
    public void Dispose(){
-    listener.Stop();if(client!=null)client.Close();
+    Resume.Set();listener.Stop();if(client!=null)client.Close();
     // A failed client must never leave a blocked accept/read behind in self-test.
     try{worker.Wait(1000);}catch(AggregateException){}
    }

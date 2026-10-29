@@ -18,7 +18,8 @@ namespace MiniDeck {
    public string BaseUrl {get;set;}
    public string ApiKeyFile {get;set;}
    public string GpuDevice {get;set;}
-   public Installation(){GpuDevice="Vulkan0";}
+   public int IdleSeconds {get;set;}
+   public Installation(){GpuDevice="Vulkan0";IdleSeconds=900;}
   }
   static readonly SemaphoreSlim starting=new SemaphoreSlim(1,1);
   static readonly object lifetime=new object();
@@ -37,6 +38,7 @@ namespace MiniDeck {
       !String.Equals(Path.GetExtension(installed.ModelPath),".gguf",StringComparison.OrdinalIgnoreCase)||
       String.IsNullOrWhiteSpace(installed.ModelId)||!System.Text.RegularExpressions.Regex.IsMatch(installed.ModelId,@"^[A-Za-z0-9._-]+$")||
       String.IsNullOrWhiteSpace(installed.GpuDevice)||!System.Text.RegularExpressions.Regex.IsMatch(installed.GpuDevice,@"^Vulkan[0-9]+$")||
+      installed.IdleSeconds<60||installed.IdleSeconds>3600||
       !File.Exists(installed.Executable)||!File.Exists(installed.ModelPath)||!WithinRoot(installed.ApiKeyFile)||!File.Exists(installed.ApiKeyFile))
     throw new InvalidOperationException(L10n.T("번역 모델 설치 파일을 찾지 못했습니다. 로컬 번역 설치를 다시 실행하세요."));
    Uri endpoint=new Uri(installed.BaseUrl);
@@ -94,7 +96,7 @@ namespace MiniDeck {
      if(owned==null||owned.HasExited){
       var info=new ProcessStartInfo(installed.Executable){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Root};
       info.Arguments="-m \""+installed.ModelPath+"\" --host 127.0.0.1 --port "+new Uri(installed.BaseUrl).Port+
-       " --alias "+installed.ModelId+" -c 16384 -np 1 -ngl 99 --device "+installed.GpuDevice+" --no-webui --offline --sleep-idle-seconds 300 --reasoning off --reasoning-budget 0 --log-disable --api-key-file \""+installed.ApiKeyFile+"\"";
+       " --alias "+installed.ModelId+" -c 16384 -np 1 -ngl 99 --device "+installed.GpuDevice+" --no-webui --offline --sleep-idle-seconds "+installed.IdleSeconds+" --reasoning off --reasoning-budget 0 --log-disable --api-key-file \""+installed.ApiKeyFile+"\"";
       if(owned!=null)owned.Dispose();owned=Process.Start(info);
      }
      running=owned;

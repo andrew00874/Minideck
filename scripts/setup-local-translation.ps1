@@ -37,7 +37,7 @@ if(!(Test-Path -LiteralPath $keyFile)) {
  [IO.File]::WriteAllText($keyFile,([BitConverter]::ToString($bytes).Replace('-','').ToLowerInvariant()),$utf8)
 }
 $baseUrl='http://127.0.0.1:17865'
-$manifest=@{Executable=(Join-Path $runtimeRoot 'llama-server.exe');ModelPath=$modelPath;ModelId=$modelId;BaseUrl=$baseUrl;ApiKeyFile=$keyFile;GpuDevice=$GpuDevice}
+$manifest=@{Executable=(Join-Path $runtimeRoot 'llama-server.exe');ModelPath=$modelPath;ModelId=$modelId;BaseUrl=$baseUrl;ApiKeyFile=$keyFile;GpuDevice=$GpuDevice;IdleSeconds=900}
 [IO.File]::WriteAllText((Join-Path $installRoot 'runtime.json'),($manifest | ConvertTo-Json),$utf8)
 foreach($license in @(@{Repository='tencent/Hy-MT2-7B-GGUF';Path='LICENSE.txt';Name='MODEL-LICENSE.txt'},@{Repository='ggml-org/llama.cpp';Path='LICENSE';Name='RUNTIME-LICENSE.txt'})) {
  $url=if($license.Name -eq 'MODEL-LICENSE.txt'){'https://huggingface.co/'+$license.Repository+'/resolve/ab8472660ac61fac25f1af43fac2599d52a8a775/'+$license.Path}else{'https://raw.githubusercontent.com/'+$license.Repository+'/b11960/'+$license.Path}
@@ -54,4 +54,4 @@ if(Test-Path -LiteralPath $settingsFile) {
  [IO.File]::WriteAllText($temporary,($settings | ConvertTo-Json -Depth 20),$utf8)
  [IO.File]::Replace($temporary,$settingsFile,$settingsFile+'.bak')
 }
-Write-Output "Ready: $modelId. MiniDeck starts the local GPU server on the first translation and stops its own server when it exits."
+Write-Output "Ready: $modelId. MiniDeck prepares its GPU model in the background and stops its own server when it exits."

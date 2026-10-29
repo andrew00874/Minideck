@@ -7,7 +7,7 @@ Validated on Windows with an AMD RX 9060 XT using the official llama.cpp b11960 
 - Preserve the existing Papago/direct-editor routing and remove the old shared 2,000-character cap while integrating immediate local translation.
 - Split long selections into bounded chunks, preserve line separators and boundary whitespace, and keep all output transient.
 - Reject incomplete or output-limited model responses rather than presenting a partial translation as complete.
-- Add a separate, checksum-verified model/runtime installer; automatically start its authenticated loopback server and stop only the process MiniDeck owns. Coordinate startup and shutdown so closing during startup cannot launch an orphan server.
+- Add a separate, checksum-verified model/runtime installer; prepare its authenticated loopback server in the background and stop only the process MiniDeck owns. Coordinate startup and shutdown so closing during startup cannot launch an orphan server.
 - Keep custom Ollama and OpenAI-compatible endpoints configurable. There is no cloud fallback.
 
 ## Validation performed
@@ -21,6 +21,14 @@ Validated on Windows with an AMD RX 9060 XT using the official llama.cpp b11960 
 
 Desktop Computer Use testing was stopped by the user with Escape before the real editor shortcut flow completed. Physical key-3 activation and broad compatibility with arbitrary/elevated editors remain unverified for this feature. App tests, actual model inference and installed settings are separate evidence from a physical-key acceptance test.
 
+## Latency follow-up
+
+The same Hy-MT2 7B weights and inference settings are retained. The result window now consumes incremental OpenAI-compatible SSE/Ollama NDJSON output. Streaming integration checks cover early partial output before the final frame, Unicode, cancellation, bounded frames, incomplete terminal responses, and JSON fallback. UI lifecycle tests also cover preview visibility and preventing cancelled/incomplete previews from becoming copyable completed results.
+
+For the 2,505-character fixture with the model loaded, the first client preview callback arrived after 0.228 seconds and completion took 24.825 seconds. The previous buffered test showed nothing until approximately 26.8 seconds. These are individual smoke measurements affected by cache and hardware state; streaming improves time to first output and does not remove the model's generation cost. A short request after a sleeping server took 3.334 seconds to first output, demonstrating the separate model-loading delay.
+
+MiniDeck now prepares its installed model during normal startup (not test/preview modes), and keeps it loaded for up to 15 idle minutes. No smaller model or reduced-quality inference profile was substituted.
+
 ## Package scope
 
-Development packages are versioned 0.3.0-beta.1 and include `scripts/setup-local-translation.ps1`. The existing 0.2.0-beta.1 release downloads remain unchanged. Model weights are downloaded separately into local application data and are not included in the application ZIP.
+Development packages are versioned 0.3.0-beta.2 and include `scripts/setup-local-translation.ps1`. The existing 0.2.0-beta.1 release downloads remain unchanged. Model weights are downloaded separately into local application data and are not included in the application ZIP.

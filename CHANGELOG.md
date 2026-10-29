@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Include an optional SHA-256-verified Hy-MT2 7B / llama.cpp Vulkan setup. MiniDeck starts its loopback-only, authenticated server on demand, lets the model sleep after five idle minutes, and stops its own server on exit. Installed model weights are kept outside the application package.
+- Show translation text as it is generated through OpenAI-compatible SSE or Ollama NDJSON, while keeping partial/cancelled results distinct from completed results. Prepare the installed model in the background at startup and extend its idle retention to 15 minutes to reduce reload waits.
+- Include an optional SHA-256-verified Hy-MT2 7B / llama.cpp Vulkan setup. MiniDeck prepares its loopback-only, authenticated server in the background, lets the model sleep after 15 idle minutes, and stops its own server on exit. Installed model weights are kept outside the application package.
 - Translate long selections in bounded chunks, preserve original line breaks, report progress and reject incomplete model responses instead of displaying them as completed translations.
 - Select text and press key 3 to translate immediately with Ollama or LM Studio on this PC. A nonmodal MiniDeck window shows the source, progress, and translation without an engine-selection or knob-confirmation step.
 - Added local connection, installed-model selection and target-language settings. Immediate local translation is enabled by default; disable it to restore the existing web text-action dial. Models must be installed separately, and the existing 0.2.0-beta.1 downloads do not include this feature.
