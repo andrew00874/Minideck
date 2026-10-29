@@ -422,11 +422,18 @@ namespace MiniDeck {
   void ButtonAt(string text,int x,int y,Action action) { Button b=new Button {Text=text,Left=x,Top=y,Width=150,Height=35}; b.Click+=delegate { action(); }; Controls.Add(b); }
   bool HasStartup() { using(RegistryKey k=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run")) return k!=null && k.GetValue("MiniDeck")!=null; }
   void ShowSettings() { Show(); WindowState=FormWindowState.Normal; Activate(); }
+  public void RecoverUiFailure(){
+   CancelCapture();overlay.Dismiss();
+   if(translationResult!=null&&!translationResult.IsDisposed)translationResult.Close();
+   status.Text=L10n.T("화면 처리 중 오류가 발생했습니다. 글을 다시 선택하고 3번 키를 눌러 주세요.");
+   tray.ShowBalloonTip(4000,"MiniDeck",status.Text,ToolTipIcon.Warning);
+  }
   public async void PrepareLocalModel(){
    if(!data.LocalTranslation.Enabled)return;
    var request=new System.Threading.CancellationTokenSource();modelWarmup=request;
    try{await LocalModelRuntime.EnsureRunningAsync(data.LocalTranslation,request.Token);}
-   catch(Exception){/* The result window reports setup errors if translation is requested. */}
+   catch(OperationCanceledException){}
+   catch(Exception error){AppDiagnostics.Exception("model-warmup",error);}
    finally{if(modelWarmup==request)modelWarmup=null;request.Dispose();}
   }
   void EditTranslationSettings() {
@@ -625,6 +632,16 @@ namespace MiniDeck {
     catch(Exception ex){File.WriteAllText(Path.Combine(args[1],"translation-tests.txt"),ex.ToString());Environment.ExitCode=1;}
     return;
    }
+   bool checkMode=args.Length==2&&(args[0]=="--self-test"||args[0]=="--preview"||args[0]=="--translation-ui-test");
+   if(!checkMode){
+    AppDiagnostics.App("starting");AppDomain.CurrentDomain.ProcessExit+=delegate{AppDiagnostics.App("exiting");};
+    Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+    Application.ThreadException+=delegate(object sender,System.Threading.ThreadExceptionEventArgs error){
+     AppDiagnostics.Exception("ui-unhandled",error.Exception);
+     try{MainForm current=Application.OpenForms.OfType<MainForm>().FirstOrDefault();if(current!=null)current.RecoverUiFailure();}catch(Exception nested){AppDiagnostics.Exception("ui-recovery",nested);}
+    };
+    AppDomain.CurrentDomain.UnhandledException+=delegate(object sender,UnhandledExceptionEventArgs error){var exception=error.ExceptionObject as Exception;if(exception!=null)AppDiagnostics.Exception("fatal",exception);};
+   }
    Native.SetProcessDPIAware();Typography.Initialize();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
    if(args.Length==2&&args[0]=="--translation-ui-test"){
     Directory.CreateDirectory(args[1]);
@@ -644,7 +661,7 @@ namespace MiniDeck {
      if(args.Contains("--background")) form.Shown+=delegate {form.Hide();};
       form.Shown+=delegate {form.PrepareLocalModel();};
      Application.Run(form);
-    } catch(Exception ex) {if(args.Length==2&&(args[0]=="--self-test"||args[0]=="--preview")){File.WriteAllText(Path.Combine(args[1],"diagnostic-error.txt"),ex.ToString());Environment.ExitCode=1;}else MessageBox.Show(L10n.T("MiniDeck 시작 실패\n")+ex.Message);}
+     } catch(Exception ex) {if(args.Length==2&&(args[0]=="--self-test"||args[0]=="--preview")){File.WriteAllText(Path.Combine(args[1],"diagnostic-error.txt"),ex.ToString());Environment.ExitCode=1;}else{AppDiagnostics.Exception("main-loop",ex);MessageBox.Show(L10n.T("MiniDeck 시작 실패\n")+ex.Message);}}
    }
   }
  }

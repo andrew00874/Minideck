@@ -94,10 +94,16 @@ namespace MiniDeck {
     lock(lifetime){
      token.ThrowIfCancellationRequested();if(stopping)throw new OperationCanceledException();
      if(owned==null||owned.HasExited){
-      var info=new ProcessStartInfo(installed.Executable){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Root};
+      var info=new ProcessStartInfo(installed.Executable){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Root,RedirectStandardError=true,RedirectStandardOutput=true};
       info.Arguments="-m \""+installed.ModelPath+"\" --host 127.0.0.1 --port "+new Uri(installed.BaseUrl).Port+
-       " --alias "+installed.ModelId+" -c 16384 -np 1 -ngl 99 --device "+installed.GpuDevice+" --no-webui --offline --sleep-idle-seconds "+installed.IdleSeconds+" --reasoning off --reasoning-budget 0 --log-disable --api-key-file \""+installed.ApiKeyFile+"\"";
-      if(owned!=null)owned.Dispose();owned=Process.Start(info);
+       " --alias "+installed.ModelId+" -c 16384 -np 1 -ngl 99 --device "+installed.GpuDevice+" --no-webui --offline --sleep-idle-seconds "+installed.IdleSeconds+" --reasoning off --reasoning-budget 0 --verbosity 0 --api-key-file \""+installed.ApiKeyFile+"\"";
+      if(owned!=null)owned.Dispose();
+      var child=new Process{StartInfo=info,EnableRaisingEvents=true};
+      DataReceivedEventHandler errorLine=delegate(object sender,DataReceivedEventArgs e){try{string kind=AppDiagnostics.ClassifyRuntimeError(e.Data);if(kind!=null)AppDiagnostics.Runtime(kind,child.Id);}catch(Exception){}};
+      child.ErrorDataReceived+=errorLine;child.OutputDataReceived+=errorLine;
+      child.Exited+=delegate{try{AppDiagnostics.Runtime(stopping?"stopped":"exited",child.Id,child.ExitCode);}catch(Exception){}};
+      try{if(!child.Start())throw new InvalidOperationException("Model process did not start");owned=child;child.BeginErrorReadLine();child.BeginOutputReadLine();AppDiagnostics.Runtime("started",child.Id);}
+      catch(Exception error){AppDiagnostics.Exception("model-start",error);child.Dispose();owned=null;throw;}
      }
      running=owned;
     }
@@ -113,7 +119,7 @@ namespace MiniDeck {
   }
   public static void Stop(){
    Process process;lock(lifetime){stopping=true;process=owned;owned=null;}
-   if(process!=null){try{if(!process.HasExited)process.Kill();}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}finally{process.Dispose();}}
+   if(process!=null){try{AppDiagnostics.Runtime("stop-requested",process.Id);if(!process.HasExited)process.Kill();}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}finally{process.Dispose();}}
   }
  }
 }

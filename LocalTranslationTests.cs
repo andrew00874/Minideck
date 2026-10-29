@@ -19,6 +19,19 @@ namespace MiniDeck {
   public static void RunUi(){
    using(var stream=new Server(200,StreamBody("OpenAI"),contentType:"text/event-stream",pause:true))
    using(var form=new TranslationResultForm(delegate{})){
+    form.BeginTranslation("display recovery sample",Settings(stream.Address,"OpenAI"));
+    PumpUntil(()=>form.ResultText=="안녕😀",3000,"display recovery test did not receive preview");
+    int request=(int)typeof(TranslationResultForm).GetField("version",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).GetValue(form);
+    var reports=new List<string>();AppDiagnostics.TestSink=reports.Add;
+    try{
+     Action failure=delegate{throw new InvalidOperationException("PRIVATE_SELECTION_DO_NOT_LOG_4812");};
+     typeof(TranslationResultForm).GetMethod("QueueUpdate",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic).Invoke(form,new object[]{request,failure});
+     Check(!form.IsTranslating&&!form.CanCopy&&form.ResultText=="","display failure was not contained");
+     Check(reports.Count>0&&!String.Join("",reports).Contains("PRIVATE_SELECTION_DO_NOT_LOG_4812"),"exception message leaked selected text into diagnostics");
+    }finally{AppDiagnostics.TestSink=null;stream.Resume.Set();form.Close();}
+   }
+   using(var stream=new Server(200,StreamBody("OpenAI"),contentType:"text/event-stream",pause:true))
+   using(var form=new TranslationResultForm(delegate{})){
     form.BeginTranslation("live preview sample",Settings(stream.Address,"OpenAI"));
     PumpUntil(()=>form.ResultText=="안녕😀",3000,"stream preview did not reach the result window before completion");
     Check(form.IsTranslating&&!form.CanCopy,"partial output was marked as complete");
@@ -109,6 +122,13 @@ namespace MiniDeck {
    Check((string)source["role"]=="user"&&(string)source["content"]==sample,"selected text changed during JSON encoding");
   }
   static async Task RunAsync(){
+   var diagnostic=new List<string>();AppDiagnostics.TestSink=diagnostic.Add;
+   try{
+    string privateText="PRIVATE_MODEL_OUTPUT_4812";
+    AppDiagnostics.Exception("test",new InvalidOperationException(privateText));
+    AppDiagnostics.Runtime(AppDiagnostics.ClassifyRuntimeError("VK_ERROR_OUT_OF_DEVICE_MEMORY "+privateText),1234);
+    Check(diagnostic.Count==2&&!String.Join("",diagnostic).Contains(privateText)&&String.Join("",diagnostic).Contains("gpu-memory"),"diagnostics did not preserve error type without private text");
+   }finally{AppDiagnostics.TestSink=null;}
    await TestStreaming();
    string sample="Selected \"text\" & \uD55C\uAE00 \\ end";
    foreach(string provider in new[]{"Ollama","OpenAI"}){

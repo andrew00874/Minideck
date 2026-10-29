@@ -239,5 +239,5 @@ Self-tests use isolated settings. Preview mode uses sample entries; the screensh
 
 Bundled library and font notices are in [THIRD-PARTY.md](THIRD-PARTY.md), `licenses/` and `fonts/`. Original manufacturer executables and decompiled vendor code are not included. No project-wide open-source license has been selected yet; third-party components retain their own licenses.
 
-Last reviewed: 2026-10-29 · Current source: 0.3.0-beta.2 (separate from the existing release)
+Last reviewed: 2026-10-30 · Current source: 0.3.0-beta.3 (separate from the existing release)
 
