@@ -117,20 +117,35 @@ Matching uses the same origin: scheme, hostname and port. For example, a saved `
 
 Different subdomains, other Chrome profiles, other browsers and incognito tabs are excluded. If the extension is disconnected, MiniDeck shows a message instead of opening a duplicate. Click the extension icon to reconnect, or allow up to 30 seconds for automatic reconnection.
 
-See [the full extension guide](browser-extension/README.md). The extension uses tab metadata and a local native-messaging connection. It does not scrape page contents, cookies or passwords. In text mode, confirming an engine navigates to its result URL with your selection. It is loaded unpacked, not from the Chrome Web Store. **Existing-tab switching and bringing Chrome to the foreground have been confirmed on a Windows/Chrome installation. Other browser scenarios still need broader testing.**
+See [the full extension guide](browser-extension/README.md). The extension uses tab metadata and a local native-messaging connection. After confirmation, it sends searches in the result URL and fills only the source editor for Google Translate or Papago. It does not collect other page contents, cookies or passwords. It is loaded unpacked, not from the Chrome Web Store. **Existing-tab switching and bringing Chrome to the foreground have been confirmed on a Windows/Chrome installation. Other browser scenarios still need broader testing.**
 
 ## Translate selected text locally
 
-This workflow is available when building the current source. It uses a model server on your PC and does not require Chrome Browser Link or an API key.
+Available in the current source and 0.3.0 development packages. Translation runs on this PC without an external API key or Chrome Browser Link. The existing 0.2.0-beta.1 release does not include this feature.
 
-1. Install and start **Ollama** or **LM Studio**, then download a model that supports the languages you need. MiniDeck does not install or download models. For example, with Ollama you can run `ollama pull qwen3:4b`; model speed and translation quality depend on the model and your PC.
-2. Open **Local translation settings** in MiniDeck Settings. Choose **Ollama** with `http://127.0.0.1:11434`, or **LM Studio (OpenAI API)** with `http://127.0.0.1:1234` and start its local server. Enter the server's root URL; MiniDeck adds the API path.
-3. Click **Load models** and select an installed model, or enter its exact model ID. The model setting starts empty. Choose a target language (Korean in the KO edition, English in the EN edition) and save with **Translate locally when key 3 is pressed** enabled.
-4. Drag to select text in the app you are using, press **key 3**, then release the keys. MiniDeck opens a result window and translates the selection immediately; no engine choice or knob press is needed.
+### Install the recommended model
 
-The result window shows the original text, progress, and the translation or a useful error. You can copy the translation, retry, or open connection settings. It stays open until you close it. **Esc** or closing the window cancels the current request and clears the displayed text; selecting new text and pressing key 3 cancels the previous request and replaces its result.
+Close MiniDeck, then run this once from the extracted application folder:
 
-Only loopback server addresses are accepted. MiniDeck does not fall back to a cloud service if the server is unavailable. Original text and results are held in memory, not saved to MiniDeck settings or logs. Your chosen local server can have its own logging or caching behavior.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-local-translation.ps1
+```
+
+The setup downloads the official **Tencent Hy-MT2 7B Q4_K_M** translation weights (about 4.6GB) and **llama.cpp b11960 Windows Vulkan** runtime, with pinned revisions and SHA-256 verification. The model supports 33 languages, including Korean. Files and license texts stay under `%LOCALAPPDATA%\MiniDeck\translation`. Existing apps, key assignments and dial placement are preserved. A working Vulkan GPU is required; initialization failures are shown instead of silently switching to CPU.
+
+Start MiniDeck, select text and press **key 3**. MiniDeck starts its server hidden on the first translation. The model sleeps after five idle minutes and prepares again on the next request. Exiting MiniDeck also stops the server it started. Change the target language under **Local translation settings**; defaults are Korean in the KO edition and English in the EN edition.
+
+For the smaller **Hy-MT2 1.8B Q8_0** model (about 1.9GB), add `-ModelSize Faster` to the setup command. It is faster, but mistranslated a technical term in the reviewed examples, so 7B is the default. Speed and quality depend on your selection and hardware.
+
+### Connect an existing local server
+
+You can also use **Ollama**, **LM Studio**, or another OpenAI-compatible local server. Open **Local translation settings**, enter its root URL, and click **Load models** to select an installed model. Defaults are `http://127.0.0.1:11434` for Ollama and `http://127.0.0.1:1234` for LM Studio. MiniDeck adds the API path. The model starts empty if the recommended installation is absent.
+
+Select text → press **key 3** → review the source, progress and translation in MiniDeck. No engine selection or knob confirmation is needed. Copy, retry and connection settings are available in the result window. A new selection cancels and replaces the previous request. **Esc** or closing cancels and clears the displayed text.
+
+There is no shared 2,000-character cap. Local translation splits selections of up to 50,000 characters into lines and bounded chunks while preserving original line breaks. Output-limit truncation is reported as an error rather than a completed translation. Long text requires multiple inference requests and can be cancelled.
+
+Only loopback addresses are accepted; unavailable servers never trigger a cloud fallback. The recommended server binds to `127.0.0.1` and uses an automatically managed per-installation authentication key. MiniDeck holds text in memory, not settings or logs. Independently configured servers can have their own logging and cache policies.
 
 ## Use web search and translation
 
@@ -140,16 +155,14 @@ In the current source, disable immediate translation in **Local translation sett
 
 1. Select text in the app you are using.
 2. Press **key 3**, then release the keys. MiniDeck reads the selection before showing the dial.
-3. Rotate to choose **Google Search, Naver Search, Bing Search, or Google Translate**. Review the original text below the dial.
+3. Rotate to choose **Google Search, Naver Search, Bing Search, Google Translate, or Papago**. Review the original text below the dial.
 4. Press the knob to send it and show the web result. **Esc**, switching modes, or idle dismissal cancels without sending.
 
-No API key is needed. **Text engines** in Settings lets you add/edit a display name and HTTP(S) URL containing `{text}`. Click **Apply item** before editing another entry, then **Save**. Google Translate defaults to Korean in the KO edition and English in the EN edition; existing settings retain their target language.
+No API key is needed. **Text engines** in Settings lets you add/edit a display name and HTTP(S) search URL containing `{text}`. Google Translate and Papago use their home-page URL with `sl` and `tl` language parameters and receive the selection directly in their editor. Existing Google Translate templates continue to work without putting the selection into the navigation URL. Click **Apply item** before editing another entry, then **Save**. New translation presets target Korean in the KO edition and English in the EN edition; existing engines retain their language. Papago is added once when upgrading existing settings; deleting it later is respected.
 
-**Update Browser Link to 1.1.0:** replace both app/host files and the extension folder, then reload MiniDeck Browser Link at `chrome://extensions`. Text actions use a separate result tab per engine and update its query. Ordinary website entries continue to preserve existing pages. Result-tab tracking resets when Chrome or the extension restarts; a new result tab is then created.
+**Update Browser Link to 1.2.0:** replace both app/host files and the extension folder, then reload MiniDeck Browser Link at `chrome://extensions`. Its `scripting` permission and site access are limited to `translate.google.com` and `papago.naver.com` for filling translation editors. Text actions use a separate result tab per engine. Ordinary website entries continue to preserve existing pages. Result-tab tracking resets when Chrome or the extension restarts; a new result tab is then created.
 
-For web actions, selection is held only in memory and cleared when dismissed; MiniDeck does not save it to settings or logs. The confirmed URL can appear in browser history and is received by the selected service.
-
-Both text workflows capture the selection with Windows UI Automation first, then fall back to Ctrl+C while preserving the clipboard where possible. Some apps copy a line when nothing is selected, so check the original text. Empty, unavailable or overlong selections are rejected (2,000 characters; web actions also limit encoded URL length). Elevated/protected apps may deny capture. The connected-device selection → key 3 → engine → knob press → web-result flow was confirmed by the user. Local translation on a real Windows PC, compatibility with other apps, and elevated windows still need broader testing.
+Selection is held only in memory and cleared when dismissed; MiniDeck does not save it to settings or logs. Confirmed selections are received by the chosen service. Searches and URLs updated by a translation service can appear in browser history. Capture first uses Windows UI Automation, then falls back to Ctrl+C while preserving the clipboard where possible. Some apps copy a line when nothing is selected, so check the preview. The shared 2,000-character limit is removed: Google Translate accepts up to 5,000 characters and the current Papago editor accepts 3,000. Over-limit translation selections are rejected before sending; they are never silently truncated. Search URLs are limited to 15,000 encoded characters, and capture has a separate 50,000-character safety bound. Elevated/protected apps may deny capture. The connected-device selection → key 3 → engine → knob press → result-page flow was confirmed by the user for the earlier URL-based mode. Compatibility with other apps and elevated windows still needs broader testing.
 
 ## 5. Save mappings to a supported keyboard
 
@@ -192,7 +205,7 @@ Settings are saved in `%APPDATA%\MiniDeck\settings.json`, with the previous save
 
 ## Beta status
 
-The 0.2.0-beta.1 language builds passed the app self-tests; English screens were visually reviewed. Those automated checks cover settings migration, selection capture, confirmation/cancellation, window lifetime checks, global hotkeys, dial navigation/drag/size, long captions, icon import, onboard packet encoding, translation coverage, browser routing and the local native-message transport. The current source adds local translation; previous release validation does not establish real-model performance or Windows UI compatibility for this feature.
+The current Korean and English builds passed all 17 app self-test groups, HTTP integration/lifecycle checks, English string coverage and browser/native-message routing tests. Actual Hy-MT2 inference was checked through MiniDeck's client, including a 2,505-character selection and preserved blank lines. Physical key-3 activation and broad editor compatibility remain unverified. See [local translation validation](docs/local-translation-validation.md) for the exact scope and model limitations.
 
 These checks do **not** prove onboard write persistence or compatibility with every mini keyboard. Existing-tab switching and foreground activation were also confirmed in Chrome on Windows. Other browser scenarios, elevated apps and mixed-DPI displays need further validation. Desktop apps outside the limited reuse case follow their normal launch behavior.
 
@@ -226,5 +239,5 @@ Self-tests use isolated settings. Preview mode uses sample entries; the screensh
 
 Bundled library and font notices are in [THIRD-PARTY.md](THIRD-PARTY.md), `licenses/` and `fonts/`. Original manufacturer executables and decompiled vendor code are not included. No project-wide open-source license has been selected yet; third-party components retain their own licenses.
 
-Last reviewed: 2026-09-18 · Version: 0.2.0-beta.1
+Last reviewed: 2026-10-29 · Current source: 0.3.0-beta.1 (separate from the existing release)
 

@@ -15,23 +15,38 @@ namespace MiniDeck {
   static readonly HashSet<string> Pending = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
   public static string PipeName { get { return "MiniDeck.Browser." + WindowsIdentity.GetCurrent().User.Value; } }
   public static async void Navigate(string url,string engineId){
+   await TextRequest(url,engineId,null);
+  }
+  public static async void Translate(string url,string engineId,string text){
+   await TextRequest(url,engineId,text);
+  }
+  static async Task TextRequest(string url,string engineId,string text){
    string pending="text:"+engineId;if(!Pending.Add(pending))return;
    try{
     // Probe without the selected text. Old hosts/extensions fail closed, so they
     // cannot mistake this action for ordinary same-origin website activation.
     var capability=await Task.Factory.StartNew(()=>Exchange(new {id=Guid.NewGuid().ToString("N"),operation="capabilities"},false));
-    if(!capability.ContainsKey("navigate")||!Convert.ToBoolean(capability["navigate"]))throw new Exception("Unsupported browser extension");
-    await Task.Factory.StartNew(()=>Exchange(new{id=Guid.NewGuid().ToString("N"),operation="navigate",url=url,engine=engineId},true));
-   }catch(Exception){MessageBox.Show(L10n.T("검색 결과를 열지 못했습니다. Chrome의 MiniDeck 확장을 새로고침하고 다시 시도해 주세요.\n확장과 MiniDeck.BrowserHost.exe가 모두 최신 버전이어야 합니다. 중복 탭은 열지 않았습니다."),"MiniDeck",MessageBoxButtons.OK,MessageBoxIcon.Information);}
+    string feature=text==null?"navigate":"translate";
+    if(!capability.ContainsKey(feature)||!Convert.ToBoolean(capability[feature]))throw new Exception("Unsupported browser extension");
+    if(text==null)await Task.Factory.StartNew(()=>Exchange(new{id=Guid.NewGuid().ToString("N"),operation="navigate",url=url,engine=engineId},true));
+    else await Task.Factory.StartNew(()=>Exchange(new{id=Guid.NewGuid().ToString("N"),operation="translate",url=url,engine=engineId,text=text},true));
+   }catch(Exception ex){string message=L10n.T("검색·번역을 열지 못했습니다. Chrome의 MiniDeck 확장을 새로고침하고 다시 시도해 주세요.\n확장과 MiniDeck.BrowserHost.exe가 모두 최신 버전이어야 합니다.");
+    if(ex is BrowserActionException)message=ex.Message;
+    MessageBox.Show(message,"MiniDeck",MessageBoxButtons.OK,MessageBoxIcon.Information);}
    finally{Pending.Remove(pending);}
   }
   static Dictionary<string,object> Exchange(object request,bool foreground){
    using(var pipe=new NamedPipeClientStream(".",PipeName,PipeDirection.InOut,PipeOptions.Asynchronous)){
     pipe.Connect(1200);if(foreground)BrowserForeground.Prepare(pipe);
     var serializer=new JavaScriptSerializer();var writer=new StreamWriter(pipe,new UTF8Encoding(false)){AutoFlush=true};var reader=new StreamReader(pipe,Encoding.UTF8);
-    writer.WriteLine(serializer.Serialize(request));var read=reader.ReadLineAsync();if(!read.Wait(8000)||read.Result==null)throw new IOException("Browser request failed");
+    writer.WriteLine(serializer.Serialize(request));var read=reader.ReadLineAsync();if(!read.Wait(30000)||read.Result==null)throw new IOException("Browser request failed");
     var result=serializer.Deserialize<Dictionary<string,object>>(read.Result);
-    if(!result.ContainsKey("ok")||!Convert.ToBoolean(result["ok"]))throw new IOException("Browser action failed");return result;
+    if(!result.ContainsKey("ok")||!Convert.ToBoolean(result["ok"])){
+     string code=result.ContainsKey("code")?Convert.ToString(result["code"]):"";
+     if(code=="translation_input")throw new BrowserActionException(L10n.T("번역 입력칸에 글을 전달하지 못했습니다. 번역 페이지가 열려 있는지, 로그인·안내 창이 가리고 있지 않은지 확인하고 다시 시도해 주세요."));
+     if(code=="translation_length")throw new BrowserActionException(L10n.T("번역 서비스의 입력 한도를 넘었습니다. 글을 나누어 선택해 주세요. 원문을 잘라서 보내지 않았습니다."));
+     throw new IOException("Browser action failed");
+    }return result;
    }
   }
   public static bool Open(string target) {
@@ -70,6 +85,7 @@ namespace MiniDeck {
    return true;
   }
  }
+ sealed class BrowserActionException:Exception {public BrowserActionException(string message):base(message){}}
  static class BrowserForeground {
   [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]
   struct ProcessEntry {

@@ -24,7 +24,7 @@ namespace MiniDeck {
    Controls.Add(new Label{Text=L10n.T("체크를 끄면 기존 검색·번역 다이얼을 사용합니다."),Left=24,Top=60,Width=610,Height=26});
    AddLabel(L10n.T("모델 실행 프로그램"),100);
    provider.SetBounds(24,128,610,30);provider.DropDownStyle=ComboBoxStyle.DropDownList;provider.AccessibleName=L10n.T("모델 실행 프로그램");
-   provider.Items.AddRange(new object[]{"Ollama","LM Studio (OpenAI API)"});Controls.Add(provider);
+   provider.Items.AddRange(new object[]{"Ollama","OpenAI API (LM Studio / llama.cpp)"});Controls.Add(provider);
    AddLabel(L10n.T("로컬 서버 주소"),174);
    address.SetBounds(24,202,610,28);address.Text=settings.BaseUrl;address.AccessibleName=L10n.T("로컬 서버 주소");Controls.Add(address);
    AddLabel(L10n.T("모델 이름"),246);
@@ -136,7 +136,8 @@ namespace MiniDeck {
   // This method contains every asynchronous failure; a closed or newer result never receives stale output.
   async void RunTranslation(string text,LocalTranslationSettings settings,int request,CancellationTokenSource cancellation){
    try{
-    string translated=await LocalTranslationClient.TranslateAsync(settings,text,cancellation.Token);
+    var progress=new Progress<string>(value=>{if(!IsDisposed&&request==version&&IsTranslating)SetStatus(value,false);});
+    string translated=await LocalTranslationClient.TranslateAsync(settings,text,cancellation.Token,progress);
     if(IsDisposed||request!=version||cancellation.IsCancellationRequested)return;
     result.Text=translated;SetStatus(L10n.T("번역 완료 · Esc로 닫기"),false);
    }catch(OperationCanceledException){if(!IsDisposed&&request==version)SetStatus(L10n.T("번역을 취소했습니다."),false);}

@@ -135,6 +135,13 @@
   "네이버 검색": "Naver Search",
   "Bing 검색": "Bing Search",
   "Google 번역": "Google Translate",
+  "파파고 번역": "Papago Translate",
+  "{0}은 한 번에 {1:N0}자까지 입력할 수 있습니다. 글을 나누어 선택해 주세요.": "{0} accepts up to {1:N0} characters at a time. Select the text in smaller sections.",
+  "선택한 글이 너무 깁니다. 50,000자 이내로 선택해 주세요.": "The selection is too long. Select at most 50,000 characters.",
+  "검색어 위치에 {text}를 넣으세요.\nGoogle 번역·파파고는 입력칸으로 전달합니다.\n번역 언어는 tl=ko 또는 tl=en으로 지정합니다.": "Use {text} for search queries.\nGoogle Translate / Papago receive text in their editor.\nSet tl=ko or tl=en for the target language.",
+  "검색·번역을 열지 못했습니다. Chrome의 MiniDeck 확장을 새로고침하고 다시 시도해 주세요.\n확장과 MiniDeck.BrowserHost.exe가 모두 최신 버전이어야 합니다.": "Could not open the search or translation. Reload the MiniDeck extension in Chrome and try again.\nBoth the extension and MiniDeck.BrowserHost.exe must be up to date.",
+  "번역 입력칸에 글을 전달하지 못했습니다. 번역 페이지가 열려 있는지, 로그인·안내 창이 가리고 있지 않은지 확인하고 다시 시도해 주세요.": "Could not fill the translation editor. Check that the translation page is open and no login or notice dialog is covering it, then try again.",
+  "번역 서비스의 입력 한도를 넘었습니다. 글을 나누어 선택해 주세요. 원문을 잘라서 보내지 않았습니다.": "The translation service input limit was exceeded. Select smaller sections. The original text was not truncated and sent.",
   "먼저 글을 선택해 주세요.": "Select some text first.",
   "선택한 글이 너무 깁니다. 2,000자 이내로 선택해 주세요.": "The selection is too long. Select at most 2,000 characters.",
   "http 또는 https 주소의 경로·쿼리에 {text}를 넣어 주세요.": "Use an HTTP(S) URL with {text} in its path or query.",
@@ -191,5 +198,11 @@
   "번역 완료 · Esc로 닫기": "Translation complete · Esc to close",
   "번역을 취소했습니다.": "Translation canceled.",
   "로컬 번역": "Local translation",
-  "로컬 번역 결과 창을 열었습니다.": "Opened the local translation result window."
+  "로컬 번역 결과 창을 열었습니다.": "Opened the local translation result window.",
+  "선택한 글이 너무 깁니다. 더 짧은 영역을 선택해 주세요.": "The selection is too long. Select a smaller area.",
+  "번역 중… {0}/{1}": "Translating… {0}/{1}",
+  "모델의 번역이 중간에 끝났습니다. 더 짧은 글로 다시 시도해 주세요.": "The model stopped before completing the translation. Try a shorter selection.",
+  "번역 모델 설치 파일을 찾지 못했습니다. 로컬 번역 설치를 다시 실행하세요.": "Translation model files are missing. Run the local translation setup again.",
+  "번역 모델을 시작하지 못했습니다. GPU와 로컬 서버 포트를 확인하세요.": "Could not start the translation model. Check your GPU and local server port.",
+  "번역 모델을 준비하는 데 시간이 오래 걸립니다. 잠시 후 다시 시도해 주세요.": "The translation model is taking too long to start. Try again shortly."
 }

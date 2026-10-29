@@ -29,6 +29,7 @@ namespace MiniDeck {
   public int DialSize {get;set;}
   public List<TextEngine> Engines {get;set;}
   public LocalTranslationSettings LocalTranslation {get;set;}
+  public int TextPresetVersion {get;set;}
   public Settings() { Apps = new List<AppEntry>(); Keys = new int[] {0,1,2}; Engines=TextActions.Defaults(); LocalTranslation=new LocalTranslationSettings(); }
  }
  static class Storage {
@@ -43,6 +44,9 @@ namespace MiniDeck {
     if(s.Engines==null)s.Engines=TextActions.Defaults();
     if(s.LocalTranslation==null)s.LocalTranslation=new LocalTranslationSettings();
     foreach(TextEngine engine in s.Engines){if(engine==null)throw new Exception("Invalid text engine");if(String.IsNullOrWhiteSpace(engine.Id))engine.Id=Guid.NewGuid().ToString("N");TextActions.BuildUrl(engine,"test");}
+    if(s.TextPresetVersion<1){if(!s.Engines.Any(e=>TextActions.TranslationUrl(e)!=null&&new Uri(TextActions.TranslationUrl(e)).Host=="papago.naver.com")){
+     var papago=TextActions.Papago();if(s.Engines.Any(e=>e.Id==papago.Id))papago.Id=Guid.NewGuid().ToString("N");s.Engines.Add(papago);
+    }s.TextPresetVersion=1;Save(s);}
     return s;
    } catch(Exception ex) {
     MessageBox.Show(L10n.T("설정을 읽지 못했습니다. 기존 파일은 유지합니다.\n") + FileName + "\n" + ex.Message, "MiniDeck");
@@ -51,6 +55,7 @@ namespace MiniDeck {
   }
   public static Settings Defaults() {
    Settings s = new Settings();
+   s.TextPresetVersion=1;
    s.Apps.Add(new AppEntry { Name="Codex", Target="explorer.exe", Arguments=@"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App" });
    s.Apps.Add(new AppEntry { Name=L10n.T("탐색기"), Target="explorer.exe", Arguments="" });
    s.Apps.Add(new AppEntry { Name=L10n.T("메모장"), Target="notepad.exe", Arguments="" });
@@ -496,7 +501,7 @@ namespace MiniDeck {
    }else{ShowTextDial(text);status.Text=L10n.T("엔진을 고른 뒤 노브를 누르면 선택한 글을 전달합니다. Esc로 취소.");}
   }
   void ShowTextDial(string text){
-   var entries=data.Engines.Select(e=>new AppEntry{Name=e.Name,Target="",ServiceIcon=EngineIcons.For(e),Invoke=delegate{BrowserLink.Navigate(TextActions.BuildUrl(e,text),e.Id);}}).ToList();
+   var entries=data.Engines.Select(e=>new AppEntry{Name=e.Name,Target="",ServiceIcon=EngineIcons.For(e),Invoke=delegate{TextActions.Open(e,text);}}).ToList();
    overlay.Configure(entries,L10n.T("검색·번역"),L10n.T("눌러서 보내기"),L10n.T("설정에서 엔진을 추가하세요"),text,selections[2]);overlay.Reveal();RegisterEscape();
   }
   protected override void OnHandleCreated(EventArgs e) {
@@ -517,7 +522,7 @@ namespace MiniDeck {
    if(!exiting && e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();return;}
    CancelCapture();overlay.Dismiss(); foreach(int id in registered)Native.UnregisterHotKey(Handle,id);
    if(translationResult!=null&&!translationResult.IsDisposed)translationResult.Close();
-   overlay.Dispose();tray.Visible=false;tray.Dispose();base.OnFormClosing(e);
+   LocalModelRuntime.Stop();overlay.Dispose();tray.Visible=false;tray.Dispose();base.OnFormClosing(e);
   }
   public void Preview(string folder) {
    Show();Application.DoEvents();using(Bitmap b=new Bitmap(Width,Height)){DrawToBitmap(b,new Rectangle(Point.Empty,Size));b.Save(Path.Combine(folder,"settings-preview.png"));}
@@ -525,6 +530,7 @@ namespace MiniDeck {
    using(OnboardForm onboard=new OnboardForm()){onboard.Show();Application.DoEvents();using(Bitmap b=new Bitmap(onboard.Width,onboard.Height)){onboard.DrawToBitmap(b,new Rectangle(Point.Empty,onboard.Size));b.Save(Path.Combine(folder,"onboard-preview.png"));}onboard.Close();}
    overlay.Reveal();Application.DoEvents();using(Bitmap b=overlay.RenderFrame()){b.Save(Path.Combine(folder,"overlay-preview.png"));}
    overlay.Dismiss();mode=DialMode.Text;ShowTextDial(L10n.English?"Make room for a little curiosity.":"오늘도 새로운 것을 발견하는 즐거움.");using(Bitmap b=overlay.RenderFrame())b.Save(Path.Combine(folder,"text-preview.png"));overlay.Dismiss();mode=DialMode.Apps;
+   mode=DialMode.Text;ShowTextDial(L10n.English?"Make room for a little curiosity.":"오늘도 새로운 것을 발견하는 즐거움.");overlay.Selected=data.Engines.FindIndex(e=>EngineIcons.For(e)=="papago");overlay.Reveal();using(Bitmap b=overlay.RenderFrame())b.Save(Path.Combine(folder,"papago-preview.png"));overlay.Dismiss();mode=DialMode.Apps;
    using(var engines=new EnginesForm(data.Engines)){engines.Show();Application.DoEvents();using(Bitmap b=new Bitmap(engines.Width,engines.Height)){engines.DrawToBitmap(b,new Rectangle(Point.Empty,engines.Size));b.Save(Path.Combine(folder,"engines-preview.png"));}engines.Close();}
    exiting=true;Close();
   }
@@ -536,22 +542,32 @@ namespace MiniDeck {
    if(calls!=1||overlay.Visible)throw new Exception("Confirmed action did not execute exactly once");
    mode=DialMode.Text;ShowTextDial("private test selection");overlay.Dismiss();
    if(new JavaScriptSerializer().Serialize(data).Contains("private test selection"))throw new Exception("Text persisted in settings");
+   ShowTextDial(new string('\uD55C',5000));using(Bitmap frame=overlay.RenderFrame())if(frame.Height>Math.Max(360,data.DialSize)+135)throw new Exception("Long selection expanded the dial");overlay.Dismiss();
    mode=DialMode.Apps;overlay.Selected=0;selections=new int[3];
    var legacy=new JavaScriptSerializer().Deserialize<Settings>("{\"Apps\":[],\"Keys\":[-1,-1,-1]}");
-   if(legacy.Engines==null||legacy.Engines.Count!=4)throw new Exception("Legacy settings migration failed");
+   if(legacy.Engines==null||legacy.Engines.Count!=5)throw new Exception("Legacy settings migration failed");
    if(legacy.LocalTranslation==null||!legacy.LocalTranslation.Enabled)throw new Exception("Local translation settings migration failed");
    LocalTranslationSettings savedTranslation=data.LocalTranslation;
-   data.LocalTranslation=new LocalTranslationSettings(); // Empty model fails locally; no server is contacted.
+   data.LocalTranslation=new LocalTranslationSettings{Model=""}; // Empty model fails locally; no server is contacted.
    mode=DialMode.Text;ShowCapturedText("private local selection");Application.DoEvents();
    if(overlay.Visible||translationResult==null||!translationResult.Visible||!translationResult.HasSelection)throw new Exception("Key 3 did not route directly to the local result window");
    if(new JavaScriptSerializer().Serialize(data).Contains("private local selection"))throw new Exception("Local translation source persisted in settings");
    translationResult.Close();data.LocalTranslation=savedTranslation;mode=DialMode.Apps;
+   var old=Storage.Defaults();old.Engines.RemoveAt(4);old.TextPresetVersion=0;
+   old.Engines[3].Url="https://translate.google.com/?sl=auto&tl=ja&text={text}&op=translate";Storage.Save(old);
+   var migrated=Storage.Load();if(migrated.Engines.Count!=5||migrated.Engines[3].Url!=old.Engines[3].Url||migrated.Apps.Count!=old.Apps.Count)throw new Exception("Papago migration changed existing settings");
+   migrated.Engines.RemoveAt(4);Storage.Save(migrated);if(Storage.Load().Engines.Count!=4)throw new Exception("Deleted Papago preset was added again");Storage.Save(data);
+   if(EngineIcons.For(TextActions.Papago())!="papago"||EngineIcons.Get("papago").Width!=192)throw new Exception("Papago logo missing");
    using(var probe=new Form{Text="MiniDeck capture test",Width=360,Height=160})using(var field=new TextBox{Text="MiniDeck selected text",Dock=DockStyle.Fill,Multiline=true}){
     probe.Controls.Add(field);probe.Show();probe.Activate();field.Focus();field.Select(9,8);Application.DoEvents();
     IntPtr fieldHandle=field.Handle;
     var read=System.Threading.Tasks.Task.Factory.StartNew(()=>SelectedTextCapture.ReadElement(System.Windows.Automation.AutomationElement.FromHandle(fieldHandle)));Stopwatch timer=Stopwatch.StartNew();
     while(!read.IsCompleted&&timer.ElapsedMilliseconds<6000){Application.DoEvents();System.Threading.Thread.Sleep(10);}
     if(!read.IsCompleted||String.Join("",read.GetAwaiter().GetResult()??new string[0])!="selected")throw new Exception("Selected text capture failed");
+    field.Text=new string('\uD55C',4000);field.SelectAll();Application.DoEvents();
+    read=System.Threading.Tasks.Task.Factory.StartNew(()=>SelectedTextCapture.ReadElement(System.Windows.Automation.AutomationElement.FromHandle(fieldHandle)));timer.Restart();
+    while(!read.IsCompleted&&timer.ElapsedMilliseconds<6000){Application.DoEvents();System.Threading.Thread.Sleep(10);}
+    if(!read.IsCompleted||String.Join("",read.GetAwaiter().GetResult()??new string[0]).Length!=4000)throw new Exception("Long selected text was truncated");
     WindowChoice window=new WindowChoice{Handle=probe.Handle,ProcessId=(uint)Process.GetCurrentProcess().Id};
     if(!WindowSwitcher.IsCurrent(window))throw new Exception("Live window rejected");
     if(WindowSwitcher.List().Any(w=>w.ProcessId==(uint)Process.GetCurrentProcess().Id))throw new Exception("Own windows leaked into switcher");

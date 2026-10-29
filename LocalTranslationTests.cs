@@ -93,7 +93,7 @@ namespace MiniDeck {
    Check((string)source["role"]=="user"&&(string)source["content"]==sample,"selected text changed during JSON encoding");
   }
   static async Task RunAsync(){
-   string sample="Selected \"text\" & \uD55C\uAE00\nsecond line \\ end";
+   string sample="Selected \"text\" & \uD55C\uAE00 \\ end";
    foreach(string provider in new[]{"Ollama","OpenAI"}){
     string response=provider=="Ollama"?"{\"message\":{\"content\":\"Bonjour\\nmonde\"}}":"{\"choices\":[{\"message\":{\"content\":\"Bonjour\\nmonde\"}}]}";
     using(var server=new Server(200,response)){
@@ -127,7 +127,28 @@ namespace MiniDeck {
    Check(original.Model=="test-model"&&copy!=original,"settings edit must be isolated until saved");
    await MustRejectArgument(async delegate{var s=original.Clone();s.Model="";await LocalTranslationClient.TranslateAsync(s,"hello",CancellationToken.None);},"empty model accepted");
    await MustRejectArgument(async delegate{await LocalTranslationClient.TranslateAsync(original,"  ",CancellationToken.None);},"empty selection accepted");
-   await MustRejectArgument(async delegate{await LocalTranslationClient.TranslateAsync(original,new string('x',2001),CancellationToken.None);},"oversize selection accepted");
+   await MustRejectArgument(async delegate{await LocalTranslationClient.TranslateAsync(original,new string('x',TextActions.MaxSelectionLength+1),CancellationToken.None);},"oversize selection accepted");
+   string longText="  "+new string('x',1797)+Char.ConvertFromUtf32(0x1f600)+new string('y',2300)+"\r\n\r\nlast line\n";
+   List<string> parts=LocalTranslationClient.SplitText(longText);
+   Check(String.Concat(parts)==longText,"chunking changed source text or newlines");
+   foreach(string part in parts)Check(part.Length<=1800&&(part.Length==0||!Char.IsHighSurrogate(part[part.Length-1]))&&(part.Length==0||!Char.IsLowSurrogate(part[0])),"chunk split a Unicode scalar or exceeded the limit");
+   foreach(string provider in new[]{"Ollama","OpenAI"}){
+    Func<string,string> response=translated=>provider=="Ollama"?"{\"message\":{\"content\":\""+translated+"\"},\"done_reason\":\"stop\"}":"{\"choices\":[{\"message\":{\"content\":\""+translated+"\"},\"finish_reason\":\"stop\"}]}";
+    using(var server=new Server(new[]{response("Bonjour"),response("monde")})){
+     string result=await LocalTranslationClient.TranslateAsync(Settings(server.Address,provider),"  first line  \r\n\r\nsecond line\n",CancellationToken.None);
+     Check(result=="  Bonjour  \r\n\r\nmonde\n","paragraph breaks or boundary whitespace changed");
+     await server.Completion;Check(server.Requests.Count==2,"blank lines should never be sent to the model");
+     CheckTranslationRequest(server.Requests[0],provider=="Ollama"?"/api/chat":"/v1/chat/completions","first line");
+     CheckTranslationRequest(server.Requests[1],provider=="Ollama"?"/api/chat":"/v1/chat/completions","second line");
+    }
+    using(var server=new Server(new[]{response("one"),response("two"),response("three")})){
+     string result=await LocalTranslationClient.TranslateAsync(Settings(server.Address,provider),new string('x',4000),CancellationToken.None);
+     Check(result=="onetwothree","long selections were rejected, dropped or reordered");
+    }
+    string incomplete=provider=="Ollama"?"{\"message\":{\"content\":\"partial\"},\"done_reason\":\"length\"}":"{\"choices\":[{\"message\":{\"content\":\"partial\"},\"finish_reason\":\"length\"}]}";
+    using(var server=new Server(200,incomplete))
+     await MustFail(async delegate{await LocalTranslationClient.TranslateAsync(Settings(server.Address,provider),sample,CancellationToken.None);},"truncated model output reported as completed translation");
+   }
    using(var server=new Server(404,"{\"error\":\"model not found\"}"))
     await MustFail(async delegate{await LocalTranslationClient.TranslateAsync(Settings(server.Address,"Ollama"),sample,CancellationToken.None);},"HTTP failure reported as success");
    foreach(string response in new[]{"not JSON","{}","{\"message\":{\"content\":\"\"}}","{\"message\":{\"content\":\"  \"}}"})
@@ -160,12 +181,18 @@ namespace MiniDeck {
    readonly TcpListener listener;readonly Task worker;readonly TaskCompletionSource<Request> received=new TaskCompletionSource<Request>();
    TcpClient client;
    public readonly string Address;
+   public readonly List<Request> Requests=new List<Request>();
    public Task<Request> Received {get{return received.Task;}}
    public Task Completion {get{return worker;}}
    public Server(int status,string body,string redirect=null,bool hold=false){
     listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
     Address="http://127.0.0.1:"+((IPEndPoint)listener.LocalEndpoint).Port;
     worker=Task.Run(delegate{Serve(status,body,redirect,hold);});
+   }
+   public Server(string[] bodies){
+    listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
+    Address="http://127.0.0.1:"+((IPEndPoint)listener.LocalEndpoint).Port;
+    worker=Task.Run(delegate{foreach(string body in bodies)Serve(200,body,null,false);});
    }
    void Serve(int status,string body,string redirect,bool hold){
     try{
@@ -180,7 +207,8 @@ namespace MiniDeck {
       byte[] content=new byte[length];int offset=0;
       while(offset<length){int count=stream.Read(content,offset,length-offset);if(count==0)throw new EndOfStreamException();offset+=count;}
       string[] first=text.Substring(0,text.IndexOf("\r\n",StringComparison.Ordinal)).Split(' ');
-      received.TrySetResult(new Request{Method=first[0],Path=first[1],Headers=text,Body=Encoding.UTF8.GetString(content)});
+      var request=new Request{Method=first[0],Path=first[1],Headers=text,Body=Encoding.UTF8.GetString(content)};
+      Requests.Add(request);received.TrySetResult(request);
       if(hold){while(stream.ReadByte()!=-1){}return;}
       byte[] payload=Encoding.UTF8.GetBytes(body);
       string response="HTTP/1.1 "+status+" Test\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: "+payload.Length+"\r\nConnection: close\r\n"+(redirect==null?"":"Location: "+redirect+"\r\n")+"\r\n";
