@@ -31,4 +31,6 @@ MiniDeck now prepares its installed model during normal startup (not test/previe
 
 ## Package scope
 
-Development packages are versioned 0.3.0-beta.2 and include `scripts/setup-local-translation.ps1`. The existing 0.2.0-beta.1 release downloads remain unchanged. Model weights are downloaded separately into local application data and are not included in the application ZIP.
+The stability follow-up uses the result window's UI queue and full text snapshots instead of native append/selection operations. A display-update exception cancels that result while keeping the launcher running. Normal UI errors are also recorded and recover the result window rather than exiting the launcher. App and model lifecycle events are recorded in a bounded local `diagnostics/events.jsonl` file; exception messages, selected text, translations, process-output lines and credentials are excluded. Native errors are reduced to fixed categories such as GPU memory/device loss or model loading. Error-injection and privacy tests cover these boundaries. The original reported crash was not reproduced and its exact cause remains unconfirmed.
+
+Development packages are versioned 0.3.0-beta.3 and include `scripts/setup-local-translation.ps1`. The existing 0.2.0-beta.1 release downloads remain unchanged. Model weights are downloaded separately into local application data and are not included in the application ZIP.

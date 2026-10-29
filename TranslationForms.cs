@@ -120,6 +120,24 @@ namespace MiniDeck {
   }
   static void ConfigureText(TextBox box){box.Multiline=true;box.ReadOnly=true;box.MaxLength=1024*1024;box.ScrollBars=ScrollBars.Vertical;box.WordWrap=true;box.TabStop=true;box.ShortcutsEnabled=true;}
   void SetStatus(string text,bool error){status.Text=text;status.ForeColor=error?Color.FromArgb(255,166,166):Theme.Muted;}
+  sealed class WindowProgress:IProgress<string> {
+   readonly Action<string> report;public WindowProgress(Action<string> action){report=action;}
+   public void Report(string value){report(value);}
+  }
+  void QueueUpdate(int request,Action update){
+   if(IsDisposed||Disposing||!IsHandleCreated)return;
+   if(InvokeRequired){
+    try{BeginInvoke((Action)delegate{QueueUpdate(request,update);});}
+    catch(InvalidOperationException){/* A closing result window drops pending previews. */}
+    return;
+   }
+   if(request!=version||!IsTranslating)return;
+   try{update();}
+   catch(Exception error){
+    AppDiagnostics.Exception("translation-display",error);
+    try{CancelTranslation();completed=false;result.Clear();SetStatus(L10n.T("결과를 표시하지 못했습니다. 다시 번역을 눌러 주세요."),true);}catch(Exception nested){AppDiagnostics.Exception("translation-display-recovery",nested);}
+   }
+  }
   void SetBusy(bool busy){IsTranslating=busy;copy.Enabled=!busy&&completed&&!String.IsNullOrWhiteSpace(result.Text);retry.Enabled=!busy&&HasSelection;stop.Enabled=busy;}
   public void BeginTranslation(string text,LocalTranslationSettings settings){
    if(IsDisposed)return;
@@ -141,8 +159,8 @@ namespace MiniDeck {
   // This method contains every asynchronous failure; a closed or newer result never receives stale output.
   async void RunTranslation(string text,LocalTranslationSettings settings,int request,CancellationTokenSource cancellation){
    try{
-    var progress=new Progress<string>(value=>{if(!IsDisposed&&request==version&&IsTranslating)SetStatus(value,false);});
-    var preview=new Progress<string>(value=>{if(!IsDisposed&&request==version&&IsTranslating){if(value.StartsWith(result.Text,StringComparison.Ordinal))result.AppendText(value.Substring(result.Text.Length));else result.Text=value;}});
+    var progress=new WindowProgress(value=>QueueUpdate(request,()=>SetStatus(value,false)));
+    var preview=new WindowProgress(value=>QueueUpdate(request,()=>{result.Text=value;}));
     string translated=await LocalTranslationClient.TranslateAsync(settings,text,cancellation.Token,progress,preview);
     if(IsDisposed||request!=version||cancellation.IsCancellationRequested)return;
     result.Text=translated;completed=true;SetStatus(L10n.T("번역 완료 · Esc로 닫기"),false);

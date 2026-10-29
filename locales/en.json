@@ -204,5 +204,7 @@
   "모델의 번역이 중간에 끝났습니다. 더 짧은 글로 다시 시도해 주세요.": "The model stopped before completing the translation. Try a shorter selection.",
   "번역 모델 설치 파일을 찾지 못했습니다. 로컬 번역 설치를 다시 실행하세요.": "Translation model files are missing. Run the local translation setup again.",
   "번역 모델을 시작하지 못했습니다. GPU와 로컬 서버 포트를 확인하세요.": "Could not start the translation model. Check your GPU and local server port.",
-  "번역 모델을 준비하는 데 시간이 오래 걸립니다. 잠시 후 다시 시도해 주세요.": "The translation model is taking too long to start. Try again shortly."
+  "번역 모델을 준비하는 데 시간이 오래 걸립니다. 잠시 후 다시 시도해 주세요.": "The translation model is taking too long to start. Try again shortly.",
+  "결과를 표시하지 못했습니다. 다시 번역을 눌러 주세요.": "Could not display the translation. Choose Translate again to retry.",
+  "화면 처리 중 오류가 발생했습니다. 글을 다시 선택하고 3번 키를 눌러 주세요.": "A display error occurred. Select the text again and press key 3."
 }
