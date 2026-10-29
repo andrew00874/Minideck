@@ -11,7 +11,7 @@ using System.Web.Script.Serialization;
 using MiniDeck;
 
 // Chrome Native Messaging host. No sockets, web server, browsing history log,
-// page content access, or arbitrary command execution.
+// selected-text persistence, or arbitrary command execution.
 class BrowserHost {
  static readonly BlockingCollection<string> Responses=new BlockingCollection<string>();
  static readonly JavaScriptSerializer Json=new JavaScriptSerializer();
@@ -34,13 +34,19 @@ class BrowserHost {
      pipe.WaitForConnection();
      var reader=new StreamReader(pipe,Encoding.UTF8);var writer=new StreamWriter(pipe,new UTF8Encoding(false));writer.AutoFlush=true;
      var read=reader.ReadLineAsync();if(!read.Wait(5000))continue;
-     string request=read.Result;if(request==null || request.Length>16000)continue;
+     string request=read.Result;if(request==null || request.Length>131072)continue;
      var value=Json.Deserialize<Dictionary<string,object>>(request);Uri uri;
      string operation=value.ContainsKey("operation")?Convert.ToString(value["operation"]):"open";
-     if(!value.ContainsKey("id")||(operation!="open"&&operation!="navigate"&&operation!="capabilities"))continue;
+     if(!value.ContainsKey("id")||(operation!="open"&&operation!="navigate"&&operation!="translate"&&operation!="capabilities"))continue;
      if(operation!="capabilities"&&(!value.ContainsKey("url") || !Uri.TryCreate(Convert.ToString(value["url"]),UriKind.Absolute,out uri) || (uri.Scheme!="https"&&uri.Scheme!="http")))continue;
+     if(operation=="translate"){
+      uri=new Uri(Convert.ToString(value["url"]));string text=value.ContainsKey("text")?value["text"] as string:null;
+      if(uri.Scheme!="https"||!uri.IsDefaultPort||uri.UserInfo!=""||uri.AbsolutePath!="/"||(uri.Host!="translate.google.com"&&uri.Host!="papago.naver.com")||String.IsNullOrWhiteSpace(text)||text.Length>(uri.Host=="papago.naver.com"?3000:5000)){
+       writer.WriteLine(Json.Serialize(new{ok=false,code="translation_length",error="Invalid translation request"}));continue;
+      }
+     }
      byte[] bytes=Encoding.UTF8.GetBytes(request);byte[] length=BitConverter.GetBytes(bytes.Length);output.Write(length,0,4);output.Write(bytes,0,bytes.Length);output.Flush();
-     DateTime deadline=DateTime.UtcNow.AddSeconds(7);bool received=false;
+     DateTime deadline=DateTime.UtcNow.AddSeconds(operation=="translate"?25:7);bool received=false;
      while(DateTime.UtcNow<deadline) {
       string reply;if(!Responses.TryTake(out reply,Math.Max(1,(int)(deadline-DateTime.UtcNow).TotalMilliseconds)))break;
       var response=Json.Deserialize<Dictionary<string,object>>(reply);

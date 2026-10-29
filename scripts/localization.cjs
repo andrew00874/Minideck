@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const root = path.resolve(__dirname, '..');
-const files = ['MiniDeck.cs','Appearance.cs','Onboard.cs','BrowserLink.cs','BrowserHost.cs','DialModes.cs'];
+const files = ['MiniDeck.cs','Appearance.cs','Onboard.cs','BrowserLink.cs','BrowserHost.cs','DialModes.cs','LocalTranslation.cs','LocalModelRuntime.cs','TranslationForms.cs'];
 // Consume comments and character literals too, so their quotation marks cannot
 // accidentally hide later C# strings from the translation coverage check.
 const tokens = /\/\/[^\r\n]*|\/\*[\s\S]*?\*\/|@"(?:[^"]|"")*"|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g;
@@ -30,3 +30,4 @@ if(process.argv.includes('--apply')) for(const file of files) {
  fs.writeFileSync(path.join(root,file),source);
 }
 console.log('PASS: English translations cover '+strings.size+' user-facing Korean strings.');
+

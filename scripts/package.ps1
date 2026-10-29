@@ -1,4 +1,4 @@
-param([ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$')][string]$Version='0.2.0-beta.1')
+param([ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$')][string]$Version='0.3.0-beta.1')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $distRoot = Join-Path $projectRoot 'dist'
@@ -13,6 +13,8 @@ foreach ($language in @('ko','en')) {
  Copy-Item -LiteralPath (Join-Path $projectRoot 'sample-icons') -Destination $folder -Recurse
  Copy-Item -LiteralPath (Join-Path $projectRoot 'docs') -Destination $folder -Recurse
  foreach ($doc in @('README.md','README.ko.md','THIRD-PARTY.md','CHANGELOG.md')) { Copy-Item -LiteralPath (Join-Path $projectRoot $doc) -Destination $folder }
+ New-Item -ItemType Directory -Path (Join-Path $folder 'scripts') -Force | Out-Null
+ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'setup-local-translation.ps1') -Destination (Join-Path $folder 'scripts')
  if($language -eq 'ko') { Copy-Item -LiteralPath (Join-Path $projectRoot 'README.ko.md') -Destination (Join-Path $folder 'START-HERE.md') }
  else { Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination (Join-Path $folder 'START-HERE.md') }
  $extensionFolder = Join-Path $folder 'browser-extension'

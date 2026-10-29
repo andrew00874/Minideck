@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { siteKey, focusOrOpen, navigateResult, handleRequest } = require('./background.js');
+const { siteKey, focusOrOpen, navigateResult, handleRequest, translationService, translateResult, fillTranslationInput } = require('./background.js');
 function fake(tabs, state='normal') {
   const calls=[];
   return {calls, tabs:{query:async()=>tabs,update:async(...x)=>calls.push(['tab',...x]),create:async(x)=>{calls.push(['create',x]);return {id:88,windowId:5};}}, windows:{get:async()=>({state}),update:async(...x)=>calls.push(['window',...x])}};
@@ -24,7 +24,7 @@ function fake(tabs, state='normal') {
  assert.equal(api.calls.length,0); // No duplicate-opening fallback after a failed activation.
  const saved={};api=fake([]);api.storage={session:{get:async(key)=>({[key]:saved[key]}),set:async(value)=>Object.assign(saved,value)}};
  api.tabs.get=async(id)=>({id,windowId:5,url:'https://www.google.com/search?q=old'});
- assert.deepEqual(await handleRequest(api,{operation:'capabilities'}),{ok:true,navigate:true});assert.equal(api.calls.length,0);
+ assert.deepEqual(await handleRequest(api,{operation:'capabilities'}),{ok:true,navigate:true,translate:true});assert.equal(api.calls.length,0);
  await navigateResult(api,'https://www.google.com/search?q=first','google');
  assert.equal(api.calls.filter(c=>c[0]==='create').length,1);
  await navigateResult(api,'https://www.google.com/search?q=second','google');
@@ -39,6 +39,28 @@ function fake(tabs, state='normal') {
  await assert.rejects(()=>handleRequest(api,{operation:'unknown'}));
  await assert.rejects(()=>navigateResult(api,'file:///x','google'));
  await assert.rejects(()=>navigateResult(api,'https://example.com','bad engine'));
+ const longText='한글 sample & ? #\n'.repeat(240); // More than 2,000 UTF-16 characters.
+ assert.ok(longText.length>2000 && longText.length<5000);
+ assert.equal(translationService('https://translate.google.com/?sl=auto&tl=ko&op=translate',longText).limit,5000);
+ for(const invalid of ['https://papago.naver.com.evil.example/','http://papago.naver.com/','https://papago.naver.com/docs','https://papago.naver.com/?text=secret','https://user@papago.naver.com/','https://papago.naver.com:444/'])assert.throws(()=>translationService(invalid,'sample'));
+ assert.throws(()=>translationService('https://papago.naver.com/', 'a'.repeat(3001)),e=>e.code==='translation_length');
+ const tracked={}; api=fake([]);let current;
+ api.storage={session:{get:async key=>({[key]:tracked[key]}),set:async v=>Object.assign(tracked,v)}};
+ api.tabs.create=async props=>{api.calls.push(['create',props]);current={id:88,windowId:5,url:props.url,status:'complete'};return current;};
+ api.tabs.get=async()=>current;
+ api.scripting={executeScript:async options=>{api.calls.push(['script',options]);return [{result:{ok:true}}];}};
+ assert.equal((await translateResult(api,'https://translate.google.com/?sl=auto&tl=ko&op=translate','translate',longText)).action,'translated');
+ assert.equal(api.calls.find(c=>c[0]==='script')[1].args[1],longText);
+ assert.equal(api.calls.find(c=>c[0]==='script')[1].func,fillTranslationInput);
+ assert.ok(!JSON.stringify(tracked).includes('sample'));
+ assert.ok(!api.calls.find(c=>c[0]==='create')[1].url.includes('text='));
+ const beforeCalls=api.calls.length;await assert.rejects(()=>translateResult(api,'https://papago.naver.com/','papago','a'.repeat(3001)));
+ assert.equal(api.calls.length,beforeCalls); // Reject before opening a tab or sending text.
+ current={...current,url:'https://translate.google.com/'};
+ api.tabs.get=async()=>({...current,pendingUrl:'https://evil.example/'});
+ await assert.rejects(()=>translateResult(api,'https://translate.google.com/','translate',longText));
+ assert.equal(api.calls.filter(c=>c[0]==='script').length,1); // Navigation race never receives text.
+ console.log('PASS: long Unicode translation uses raw editor input, approved origins only, limits reject before navigation, no text storage, navigation race rejects before injection');
  console.log('PASS: capability probe has no side effects, confirmed searches navigate only owned result tabs, repurposed/closed tabs are safe, text is not stored');
  console.log('PASS: existing routes preserved, minimize restore, MRU selection, absent-tab creation, exact origin isolation, incognito exclusion, loading tabs, failure without duplicate');
 })().catch(e=>{console.error(e);process.exitCode=1});

@@ -17,7 +17,7 @@ Bundled fonts: Pretendard 1.3.9 (https://github.com/orioncactus/pretendard) and 
 
 ## Search and translation service icons
 
-The service-identification SVGs are embedded in MiniDeck.exe and rendered locally. Logos and trademarks belong to their respective owners; their inclusion does not imply endorsement. Collection license notices are bundled in `licenses/`.
+The service-identification SVGs and PNG are embedded in MiniDeck.exe and rendered locally. Logos and trademarks belong to their respective owners; their inclusion does not imply endorsement. Collection license notices are bundled in `licenses/`.
 
 | Asset | Source | Collection license / adaptation |
 | --- | --- | --- |
@@ -25,5 +25,10 @@ The service-identification SVGs are embedded in MiniDeck.exe and rendered locall
 | Bing | [gilbarbara/logos, bing.svg](https://github.com/gilbarbara/logos/blob/a5b65275e761a8347a99eded1101c6b130a06e52/logos/bing.svg) | CC0; unchanged |
 | Google Translate | [homarr-labs/dashboard-icons](https://github.com/homarr-labs/dashboard-icons/blob/36c0d7fb93374b79c1247a80249c6dda36476411/svg/google-translate.svg) | Apache-2.0 collection; unchanged |
 | Naver | [Simple Icons, naver.svg](https://github.com/simple-icons/simple-icons/blob/f2365d33171bd1897a41aaae6c0b6e795bcc0483/icons/naver.svg) | CC0; set fill to Naver green `#03C75A` |
+| Papago | [Official NAVER Papago app icon](https://papago.naver.com/images/icon-192x192.png) | NAVER trademark; unchanged, used to identify the service |
 
 The generic magnifying-glass SVG for other engines was drawn for MiniDeck. Exact download URLs are recorded in `assets/engines/sources.json` in the source checkout.
+
+## Optional local translation
+
+`scripts/setup-local-translation.ps1` separately downloads the official [llama.cpp b11960 Windows Vulkan runtime](https://github.com/ggml-org/llama.cpp/releases/tag/b11960) (MIT) and [Tencent Hy-MT2](https://huggingface.co/tencent/Hy-MT2-7B-GGUF) translation weights (Apache-2.0). Runtime archives and model weights are pinned and verified by SHA-256. They are stored in the current user's local application data, not bundled in MiniDeck's ZIP. Their license texts are saved alongside the downloaded files. No paid service or cloud model is used by this installation.

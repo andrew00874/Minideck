@@ -22,16 +22,37 @@ namespace MiniDeck {
   public override string ToString(){return Name;}
  }
  static class TextActions {
-  public const int MaxTextLength=2000;
+  public const int MaxSelectionLength=50000;
   public static List<TextEngine> Defaults(){return new List<TextEngine>{
    new TextEngine{Id="google",Name=L10n.T("Google 검색"),Glyph="G",Url="https://www.google.com/search?q={text}"},
    new TextEngine{Id="naver",Name=L10n.T("네이버 검색"),Glyph="N",Url="https://search.naver.com/search.naver?query={text}"},
    new TextEngine{Id="bing",Name=L10n.T("Bing 검색"),Glyph="b",Url="https://www.bing.com/search?q={text}"},
-   new TextEngine{Id="translate",Name=L10n.T("Google 번역"),Glyph="A",Url=L10n.English?"https://translate.google.com/?sl=auto&tl=en&text={text}&op=translate":"https://translate.google.com/?sl=auto&tl=ko&text={text}&op=translate"}
+   new TextEngine{Id="translate",Name=L10n.T("Google 번역"),Glyph="A",Url=L10n.English?"https://translate.google.com/?sl=auto&tl=en&op=translate":"https://translate.google.com/?sl=auto&tl=ko&op=translate"},
+   Papago()
   };}
+  public static TextEngine Papago(){return new TextEngine{Id="papago",Name=L10n.T("파파고 번역"),Glyph="P",Url=L10n.English?"https://papago.naver.com/?sl=auto&tl=en":"https://papago.naver.com/?sl=auto&tl=ko"};}
+  public static string TranslationUrl(TextEngine engine){
+   Uri uri;if(engine==null||!Uri.TryCreate((engine.Url??"").Replace("{text}",""),UriKind.Absolute,out uri)||uri.Scheme!="https"||!uri.IsDefaultPort||uri.UserInfo!=""||uri.AbsolutePath!="/"||(uri.Host!="translate.google.com"&&uri.Host!="papago.naver.com"))return null;
+   string source="auto",target=L10n.English?"en":"ko";
+   foreach(string part in uri.Query.TrimStart('?').Split('&')){string[] pair=part.Split(new[]{'='},2);if(pair.Length!=2)continue;
+    string value=Uri.UnescapeDataString(pair[1]);if(!System.Text.RegularExpressions.Regex.IsMatch(value,"^[a-zA-Z-]{2,20}$"))continue;
+    if(pair[0]=="sl"||pair[0]=="sk")source=value;if(pair[0]=="tl"||pair[0]=="tk")target=value;
+   }
+   return "https://"+uri.Host+"/?sl="+source+"&tl="+target+(uri.Host=="translate.google.com"?"&op=translate":"");
+  }
+  public static void Open(TextEngine engine,string text){
+   string translation=TranslationUrl(engine);
+   if(translation!=null){
+    int limit=new Uri(translation).Host=="papago.naver.com"?3000:5000;
+    if(String.IsNullOrWhiteSpace(text))throw new ArgumentException(L10n.T("먼저 글을 선택해 주세요."));
+    if(text.Length>limit)throw new ArgumentException(String.Format(L10n.T("{0}은 한 번에 {1:N0}자까지 입력할 수 있습니다. 글을 나누어 선택해 주세요."),engine.Name,limit));
+    BrowserLink.Translate(translation,engine.Id,text);
+   }else BrowserLink.Navigate(BuildUrl(engine,text),engine.Id);
+  }
   public static string BuildUrl(TextEngine engine,string text){
    if(String.IsNullOrWhiteSpace(text))throw new ArgumentException(L10n.T("먼저 글을 선택해 주세요."));
-   if(text.Length>MaxTextLength)throw new ArgumentException(L10n.T("선택한 글이 너무 깁니다. 2,000자 이내로 선택해 주세요."));
+   string translation=TranslationUrl(engine);if(translation!=null)return translation;
+   if(text.Length>15000)throw new ArgumentException(L10n.T("검색 주소가 너무 깁니다. 더 짧은 글을 선택해 주세요."));
    Uri parsed;
    string template=engine.Url??"";
    var authority=System.Text.RegularExpressions.Regex.Match(template,@"^https?://[^/?#]*",System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -50,8 +71,11 @@ namespace MiniDeck {
     bool rejected=false;try{BuildUrl(new TextEngine{Url=invalid},"x");}catch(ArgumentException){rejected=true;}
     if(!rejected)throw new Exception("Unsafe template accepted");
    }
-   bool tooLong=false;try{BuildUrl(engine,new string('x',MaxTextLength+1));}catch(ArgumentException){tooLong=true;}
+   bool tooLong=false;try{BuildUrl(engine,new string('x',15001));}catch(ArgumentException){tooLong=true;}
    if(!tooLong)throw new Exception("Text length limit missing");
+   if(!BuildUrl(engine,new string('x',3000)).Contains(new string('x',3000)))throw new Exception("Long search rejected");
+   foreach(var translator in new[]{Defaults()[3],Papago(),new TextEngine{Url="https://translate.google.com/?tl=ja&text={text}"}}){string clean=BuildUrl(translator,new string('\uD55C',3000));if(clean.Contains("text=")||clean.Contains("%"))throw new Exception("Translation leaked into URL");}
+   if(TranslationUrl(new TextEngine{Url="https://papago.naver.com.evil.example/?text={text}"})!=null)throw new Exception("Translation origin mismatch");
   }
  }
 
@@ -118,7 +142,7 @@ namespace MiniDeck {
     if(element.Current.IsPassword)return new[]{""};
     object pattern;
     if(!element.TryGetCurrentPattern(TextPattern.Pattern,out pattern))return null;
-    return ((TextPattern)pattern).GetSelection().Select(r=>r.GetText(TextActions.MaxTextLength+1)).ToArray();
+    return ((TextPattern)pattern).GetSelection().Select(r=>r.GetText(TextActions.MaxSelectionLength+1)).ToArray();
   }
   public static async Task<string> Read(IntPtr source,Func<bool> cancelled){
    for(int i=0;i<60&&ModifiersDown();i++)await Task.Delay(20);
@@ -132,7 +156,7 @@ namespace MiniDeck {
      if(selection!=null){
       string selected=String.Join("\n",selection);
       if(String.IsNullOrWhiteSpace(selected))throw new InvalidOperationException(L10n.T("먼저 글을 선택해 주세요."));
-      if(selected.Length>TextActions.MaxTextLength)throw new InvalidOperationException(L10n.T("선택한 글이 너무 깁니다. 2,000자 이내로 선택해 주세요."));
+      if(selected.Length>TextActions.MaxSelectionLength)throw new InvalidOperationException(L10n.T("선택한 글이 너무 깁니다. 50,000자 이내로 선택해 주세요."));
       return selected;
      }
     }
@@ -158,7 +182,7 @@ namespace MiniDeck {
       string text=Clipboard.ContainsText(TextDataFormat.UnicodeText)?Clipboard.GetText(TextDataFormat.UnicodeText):null;
       if(cancelled()||WindowSwitcher.GetForegroundWindow()!=source)return null;
       if(String.IsNullOrWhiteSpace(text))break;
-      if(text.Length>TextActions.MaxTextLength)throw new InvalidOperationException(L10n.T("선택한 글이 너무 깁니다. 2,000자 이내로 선택해 주세요."));
+      if(text.Length>TextActions.MaxSelectionLength)throw new InvalidOperationException(L10n.T("선택한 글이 너무 깁니다. 50,000자 이내로 선택해 주세요."));
       return text;
      }
      if(cancelled()||WindowSwitcher.GetForegroundWindow()!=source)return null;
@@ -193,7 +217,7 @@ namespace MiniDeck {
    };
    Controls.Add(new Label{Text=L10n.T("표시 이름"),Left=246,Top=68,Width=370});name.SetBounds(246,98,378,30);Controls.Add(name);
    Controls.Add(new Label{Text=L10n.T("결과 주소 · {text} = 선택한 글"),Left=246,Top=152,Width=380});url.SetBounds(246,184,378,104);url.Multiline=true;url.ScrollBars=ScrollBars.Vertical;Controls.Add(url);
-   Controls.Add(new Label{Text=L10n.T("검색어 위치에 {text}를 넣으세요.\n번역 언어는 주소의 tl=ko 또는 tl=en으로 지정합니다."),Left=246,Top=304,Width=380,Height=58});
+   Controls.Add(new Label{Text=L10n.T("검색어 위치에 {text}를 넣으세요.\nGoogle 번역·파파고는 입력칸으로 전달합니다.\n번역 언어는 tl=ko 또는 tl=en으로 지정합니다."),Left=246,Top=304,Width=380,Height=58});
    name.AccessibleName=L10n.T("표시 이름");url.AccessibleName=L10n.T("결과 주소 · {text} = 선택한 글");
    Button add=new Button{Text=L10n.T("추가"),Left=24,Top=360,Width=94,Height=36};Button remove=new Button{Text=L10n.T("삭제"),Left=130,Top=360,Width=94,Height=36};
    Button apply=new Button{Text=L10n.T("항목 적용"),Left=246,Top=370,Width=160,Height=36};

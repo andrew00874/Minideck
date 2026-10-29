@@ -33,6 +33,7 @@ namespace MiniDeck {
    switch(url.Host.ToLowerInvariant()){
     case "google.com":case "www.google.com":return "google";
     case "translate.google.com":return "translate";
+    case "papago.naver.com":return "papago";
     case "naver.com":case "www.naver.com":case "search.naver.com":return "naver";
     case "bing.com":case "www.bing.com":return "bing";
     default:return "search";
@@ -40,9 +41,9 @@ namespace MiniDeck {
   }
   public static Bitmap Get(string name){
    Bitmap icon;if(cache.TryGetValue(name,out icon))return icon;
-   using(Stream source=typeof(EngineIcons).Assembly.GetManifestResourceStream("MiniDeck.Engine."+name+".svg")){
+   using(Stream source=typeof(EngineIcons).Assembly.GetManifestResourceStream("MiniDeck.Engine."+name+(name=="papago"?".png":".svg"))){
     if(source==null)throw new InvalidOperationException("Missing bundled engine icon: "+name);
-    icon=IconStore.DecodeSvg(source);
+    if(name=="papago"){using(Bitmap original=new Bitmap(source))icon=new Bitmap(original);}else icon=IconStore.DecodeSvg(source);
    }
    cache[name]=icon;return icon;
   }
