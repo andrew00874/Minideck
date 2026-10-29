@@ -123,6 +123,9 @@ namespace MiniDeck {
   void SetBusy(bool busy){IsTranslating=busy;copy.Enabled=!busy&&completed&&!String.IsNullOrWhiteSpace(result.Text);retry.Enabled=!busy&&HasSelection;stop.Enabled=busy;}
   public void BeginTranslation(string text,LocalTranslationSettings settings){
    if(IsDisposed)return;
+   // Standalone/test hosts may not have entered Application.Run yet.
+   // Preview callbacks and the final continuation must share the UI queue.
+   if(!(SynchronizationContext.Current is WindowsFormsSynchronizationContext))SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
    CancelActive();int request=version;
    completed=false;selectedText=text;lastSettings=(settings??new LocalTranslationSettings()).Clone();source.Text=text??"";result.Clear();
    if(!Visible){

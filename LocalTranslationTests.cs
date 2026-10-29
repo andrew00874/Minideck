@@ -54,7 +54,7 @@ namespace MiniDeck {
     retrySettings.Provider="OpenAI";retrySettings.BaseUrl=retryServer.Address;retrySettings.Model="retry-model";
     form.RetryWithSettings(retrySettings);
     PumpUntil(()=>!form.IsTranslating,5000,"retry with updated settings did not complete");
-    Check(form.ResultText=="Retried translation 4219"&&form.SourceText==newest,"retry did not reuse the selected text with updated settings");
+    Check(form.ResultText=="Retried translation 4219"&&form.SourceText==newest,"retry did not reuse the selected text with updated settings; result="+form.ResultText+"; source="+form.SourceText+"; status="+form.StatusText);
     Check(retryServer.Received.IsCompleted&&!retryServer.Received.IsFaulted,"retry did not use the new endpoint");
     CheckTranslationRequest(retryServer.Received.GetAwaiter().GetResult(),"/v1/chat/completions",newest,"retry-model",true);
     Check(nextSettings.Provider=="Ollama"&&nextSettings.BaseUrl==nextServer.Address&&nextSettings.Model=="test-model","retry mutated the original settings snapshot");
