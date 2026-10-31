@@ -32,7 +32,9 @@ jobs:
         shell: pwsh
         run: |
           $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
-          & $compiler /nologo /target:exe /out:artifacts/RuntimeFixture.exe tests/RuntimeFixture.cs
+          $fixture = Join-Path $PWD 'artifacts\RuntimeFixture.exe'
+          $fixtureSource = Join-Path $PWD 'tests\RuntimeFixture.cs'
+          & $compiler /nologo /target:exe "/out:$fixture" $fixtureSource
           if ($LASTEXITCODE -ne 0) { throw 'Runtime fixture build failed' }
           foreach ($language in @('ko','en')) {
             $binary = Get-ChildItem artifacts -Filter MiniDeck.exe -Recurse | Where-Object { $_.Directory.Name -like "MiniDeck-*-win-$language" } | Select-Object -First 1
@@ -42,7 +44,6 @@ jobs:
             if (!$process.WaitForExit(60000)) { $process.Kill(); throw 'Translation tests timed out' }
             Get-Content (Join-Path $output 'translation-tests.txt')
             if ($process.ExitCode -ne 0) { throw "Translation tests failed ($language)" }
-            $fixture = Join-Path $PWD 'artifacts/RuntimeFixture.exe'
             $process = Start-Process -FilePath $binary.FullName -ArgumentList @('--runtime-test', "`"$output`"", "`"$fixture`"") -WindowStyle Hidden -PassThru
             if (!$process.WaitForExit(60000)) { $process.Kill(); throw 'Runtime tests timed out' }
             Get-Content (Join-Path $output 'runtime-tests.txt')
