@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Manage the installed translator as a built-in engine, resolve stale saved endpoints from its installation, recover owned process exits in the background, and retry interrupted translation chunks once while clearing partial output. Custom Ollama/LM Studio servers remain user-managed. Bound background restarts and preserve cancellation and private-text boundaries.
+- Enlarge translation text from 10pt to 14pt and translation controls/settings to 12pt. Normalize display line endings for Windows text controls so source/result paragraphs stay visible. Hide server-address controls for the built-in engine and show preparation/recovery status instead of asking users to run a server.
 - Marshal streamed text updates through the result window, replace text snapshots without native append/selection operations, and contain display errors without exiting the launcher. Add bounded structural app/model lifecycle diagnostics that exclude exception messages, model output, selected text and credentials.
 - Show translation text as it is generated through OpenAI-compatible SSE or Ollama NDJSON, while keeping partial/cancelled results distinct from completed results. Prepare the installed model in the background at startup and extend its idle retention to 15 minutes to reduce reload waits.
 - Include an optional SHA-256-verified Hy-MT2 7B / llama.cpp Vulkan setup. MiniDeck prepares its loopback-only, authenticated server in the background, lets the model sleep after 15 idle minutes, and stops its own server on exit. Installed model weights are kept outside the application package.

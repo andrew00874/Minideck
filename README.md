@@ -135,6 +135,8 @@ The setup downloads the official **Tencent Hy-MT2 7B Q4_K_M** translation weight
 
 Start MiniDeck, select text and press **key 3**. MiniDeck prepares its installed model in the background at startup. The model sleeps after 15 idle minutes and prepares again on the next request; it occupies GPU memory while loaded. Exiting MiniDeck also stops the server it started. Change the target language under **Local translation settings**; defaults are Korean in the KO edition and English in the EN edition.
 
+Choose **MiniDeck built-in translation** to let MiniDeck manage the engine without a server address or a separate Ollama app. MiniDeck recovers owned engine exits and retries an interrupted translation chunk once, showing preparation and recovery status. If recovery still fails, choose **Translate again**. Source text and translations use 14pt text; translation controls and settings use 12pt.
+
 For the smaller **Hy-MT2 1.8B Q8_0** model (about 1.9GB), add `-ModelSize Faster` to the setup command. It is faster, but mistranslated a technical term in the reviewed examples, so 7B is the default. Speed and quality depend on your selection and hardware.
 
 ### Connect an existing local server
@@ -198,7 +200,7 @@ Settings are saved in `%APPDATA%\MiniDeck\settings.json`, with the previous save
 | Another MiniDeck is already running | Open its tray icon; quit it before switching language editions. |
 | Shortcuts do nothing | Check the status line for conflicts and verify the keyboard's six mappings. |
 | Browser Link is disconnected | Open Chrome, enable the extension and click its icon. Rerun setup after moving MiniDeck. |
-| Local translation cannot connect | Start Ollama or LM Studio's local server, check its root URL in Local translation settings, refresh the model list, and select an installed model. Browser Link is not used for local translation. |
+| Local translation cannot connect | With **MiniDeck built-in translation**, the engine starts and recovers automatically; use **Check engine** or **Translate again** if it still fails. A missing model requires the one-time model setup above. For a custom Ollama/LM Studio connection, start that app and verify its address and model. |
 | Keyboard is not detected | Connect only one supported device; check its protocol, not just its appearance. |
 | An installed app opens again | Existing-window reuse is limited to absolute-path EXEs without arguments and can fall back to launching if activation fails. |
 | The app fails after being copied | Extract all DLLs and the `fonts` folder; check .NET Framework 4.8 is installed. |

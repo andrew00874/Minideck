@@ -13,7 +13,7 @@ foreach ($library in $libraries) { Copy-Item -LiteralPath (Join-Path "$PSScriptR
 $common = @('/nologo', '/reference:System.Web.Extensions.dll', "/resource:$PSScriptRoot\locales\en.json,MiniDeck.English")
 if ($Language -eq 'en') { $common += '/define:ENGLISH' }
 foreach ($assembly in @('UIAutomationClient.dll','UIAutomationTypes.dll','WindowsBase.dll')) { $common += '/reference:' + (Join-Path (Split-Path $compiler) "WPF\$assembly") }
-$sources = @('MiniDeck.cs','Appearance.cs','LayeredWindow.cs','Onboard.cs','BrowserLink.cs','DialModes.cs','Localization.cs','AppDiagnostics.cs','LocalTranslation.cs','TranslationStream.cs','LocalModelRuntime.cs','TranslationForms.cs','LocalTranslationTests.cs') | ForEach-Object {Join-Path $PSScriptRoot $_}
+$sources = @('MiniDeck.cs','Appearance.cs','LayeredWindow.cs','Onboard.cs','BrowserLink.cs','DialModes.cs','Localization.cs','AppDiagnostics.cs','LocalTranslation.cs','TranslationStream.cs','LocalModelRuntime.cs','LocalModelRuntimeTests.cs','TranslationForms.cs','LocalTranslationTests.cs') | ForEach-Object {Join-Path $PSScriptRoot $_}
 $engineResources = Get-ChildItem -LiteralPath "$PSScriptRoot\assets\engines" -File | Where-Object { $_.Extension -in @('.svg','.png') } | ForEach-Object { "/resource:$($_.FullName),MiniDeck.Engine.$($_.Name)" }
 & $compiler @common @engineResources /target:winexe /win32manifest:"$PSScriptRoot\app.manifest" /win32icon:"$PSScriptRoot\assets\minideck.ico" /resource:"$PSScriptRoot\assets\minideck.ico,MiniDeck.AppIcon" /resource:"$PSScriptRoot\assets\minideck.png,MiniDeck.AppImage" /out:"$outputPath\MiniDeck.exe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:"$outputPath\Svg.dll" @sources
 if ($LASTEXITCODE -ne 0) { throw 'MiniDeck build failed' }

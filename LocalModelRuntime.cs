@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 
 namespace MiniDeck {
+ sealed class LocalTranslationUnavailableException:InvalidOperationException {
+  public LocalTranslationUnavailableException(string message):base(message){}
+ }
  // Only the separately installed MiniDeck translation runtime is started here.
  // Custom Ollama/OpenAI-compatible servers remain under the user's control.
  static class LocalModelRuntime {
@@ -25,7 +28,8 @@ namespace MiniDeck {
   static readonly object lifetime=new object();
   static Process owned;
   static bool stopping;
-  static string Root {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"MiniDeck","translation");}}
+  internal static string TestRoot;
+  static string Root {get{return TestRoot??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"MiniDeck","translation");}}
   static bool WithinRoot(string path){return !String.IsNullOrWhiteSpace(path)&&Path.GetFullPath(path).StartsWith(Path.GetFullPath(Root)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase);}
   static Installation ReadManifest(){
    string file=Path.Combine(Root,"runtime.json");
@@ -45,18 +49,26 @@ namespace MiniDeck {
    if(endpoint.Host!="127.0.0.1"||endpoint.Scheme!="http"||endpoint.AbsolutePath!="/"||endpoint.UserInfo!=""||endpoint.Query!=""||endpoint.Fragment!="")throw new InvalidOperationException(L10n.T("로컬 번역 설정을 확인해 주세요."));
   }
   static Installation ReadInstallation(LocalTranslationSettings settings){
-   if(settings.Provider!="OpenAI")return null;
+   if(settings==null||(settings.Provider!="MiniDeck"&&settings.Provider!="OpenAI"))return null;
    Installation installed=ReadManifest();
-   if(installed==null||String.IsNullOrWhiteSpace(installed.BaseUrl)||!String.Equals(installed.BaseUrl.TrimEnd('/'),settings.BaseUrl.TrimEnd('/'),StringComparison.OrdinalIgnoreCase))return null;
+   if(settings.Provider!="MiniDeck"&&(installed==null||String.IsNullOrWhiteSpace(installed.BaseUrl)||!String.Equals(installed.BaseUrl.TrimEnd('/'),(settings.BaseUrl??"").TrimEnd('/'),StringComparison.OrdinalIgnoreCase)))return null;
+   if(installed==null)throw new InvalidOperationException(L10n.T("번역 모델 설치 파일을 찾지 못했습니다. 로컬 번역 설치를 다시 실행하세요."));
    ValidateInstallation(installed);
    return installed;
   }
-  public static void ApplyInstalledDefault(LocalTranslationSettings settings){
+  public static bool ApplyInstalledDefault(LocalTranslationSettings settings){
    try{
-    Installation installed=ReadManifest();if(installed==null)return;
+    Installation installed=ReadManifest();if(installed==null)return false;
     ValidateInstallation(installed);Key(installed);
-    settings.Provider="OpenAI";settings.BaseUrl=installed.BaseUrl;settings.Model=installed.ModelId;
-   }catch(Exception){/* An incomplete optional installation must not break startup. */}
+    settings.Provider="MiniDeck";settings.BaseUrl=installed.BaseUrl;settings.Model=installed.ModelId;return true;
+   }catch(Exception){return false;/* An incomplete optional installation must not break startup. */}
+  }
+  public static bool IsManaged(LocalTranslationSettings settings){return ReadInstallation(settings)!=null;}
+  // Resolve managed settings on every request; stale saved ports/model names must
+  // never turn the installed engine into a manually managed external connection.
+  public static void Resolve(LocalTranslationSettings settings){
+   Installation installed=ReadInstallation(settings);if(installed==null)return;
+   settings.Provider="MiniDeck";settings.BaseUrl=installed.BaseUrl;settings.Model=installed.ModelId;
   }
   static string Key(Installation installed){
    string key=File.ReadAllText(installed.ApiKeyFile).Trim();
@@ -84,11 +96,12 @@ namespace MiniDeck {
    }
    token.ThrowIfCancellationRequested();return false;
   }
-  public static async Task EnsureRunningAsync(LocalTranslationSettings settings,CancellationToken token){
+  public static async Task EnsureRunningAsync(LocalTranslationSettings settings,CancellationToken token,IProgress<string> progress=null){
    Installation installed=ReadInstallation(settings);if(installed==null)return;
    await starting.WaitAsync(token).ConfigureAwait(false);
    try{
     if(await Ready(installed,token).ConfigureAwait(false))return;
+    if(progress!=null)progress.Report(L10n.T("내장 번역 엔진을 준비하는 중… 자동으로 시작합니다."));
     token.ThrowIfCancellationRequested();
     Process running;
     lock(lifetime){
@@ -103,19 +116,47 @@ namespace MiniDeck {
       child.ErrorDataReceived+=errorLine;child.OutputDataReceived+=errorLine;
       child.Exited+=delegate{try{AppDiagnostics.Runtime(stopping?"stopped":"exited",child.Id,child.ExitCode);}catch(Exception){}};
       try{if(!child.Start())throw new InvalidOperationException("Model process did not start");owned=child;child.BeginErrorReadLine();child.BeginOutputReadLine();AppDiagnostics.Runtime("started",child.Id);}
-      catch(Exception error){AppDiagnostics.Exception("model-start",error);child.Dispose();owned=null;throw;}
+      catch(Exception error){
+       AppDiagnostics.Exception("model-start",error);
+       try{if(!child.HasExited)child.Kill();}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}
+       child.Dispose();owned=null;throw new LocalTranslationUnavailableException(L10n.T("내장 번역 엔진을 준비하지 못했습니다. 다시 번역을 눌러 주세요."));
+      }
      }
      running=owned;
     }
     Stopwatch watch=Stopwatch.StartNew();
     while(watch.ElapsedMilliseconds<90000){
      token.ThrowIfCancellationRequested();
-     if(running.HasExited)throw new InvalidOperationException(L10n.T("번역 모델을 시작하지 못했습니다. GPU와 로컬 서버 포트를 확인하세요."));
+     if(running.HasExited)throw new LocalTranslationUnavailableException(L10n.T("내장 번역 엔진을 준비하지 못했습니다. 다시 번역을 눌러 주세요."));
      if(await Ready(installed,token).ConfigureAwait(false))return;
      await Task.Delay(250,token).ConfigureAwait(false);
     }
-    throw new TimeoutException(L10n.T("번역 모델을 준비하는 데 시간이 오래 걸립니다. 잠시 후 다시 시도해 주세요."));
+    // Reap only our failed child. An unrelated listener is never terminated.
+    ReleaseFailed(running);
+    throw new LocalTranslationUnavailableException(L10n.T("내장 번역 엔진을 준비하지 못했습니다. 다시 번역을 눌러 주세요."));
    }finally{starting.Release();}
+  }
+  static bool OwnedExited(){lock(lifetime){return owned!=null&&owned.HasExited;}}
+  static void ReleaseFailed(Process failed){
+   lock(lifetime){if(owned!=failed)return;owned=null;}
+   try{if(!failed.HasExited)failed.Kill();}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}finally{failed.Dispose();}
+  }
+  // Check process lifetime only: readiness polling would wake an idle model.
+  // Limit background recovery so a persistent GPU failure cannot restart forever.
+  public static async Task SuperviseAsync(LocalTranslationSettings settings,CancellationToken token){
+   settings=settings.Clone();Resolve(settings);if(!IsManaged(settings))return;
+   bool initial=true;var attempts=new Queue<DateTime>();
+   while(true){
+    token.ThrowIfCancellationRequested();
+    while(attempts.Count>0&&DateTime.UtcNow-attempts.Peek()>TimeSpan.FromMinutes(5))attempts.Dequeue();
+    if((initial||OwnedExited())&&attempts.Count<3){
+     initial=false;attempts.Enqueue(DateTime.UtcNow);
+     try{await EnsureRunningAsync(settings,token).ConfigureAwait(false);}
+     catch(OperationCanceledException){throw;}
+     catch(Exception error){initial=true;AppDiagnostics.Exception("model-supervision",error);}
+    }
+    await Task.Delay(3000,token).ConfigureAwait(false);
+   }
   }
   public static void Stop(){
    Process process;lock(lifetime){stopping=true;process=owned;owned=null;}
