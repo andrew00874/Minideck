@@ -131,7 +131,7 @@ Close MiniDeck, then run this once from the extracted application folder:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-local-translation.ps1
 ```
 
-The setup downloads the official **Tencent Hy-MT2 7B Q4_K_M** translation weights (about 4.6GB) and **llama.cpp b11960 Windows Vulkan** runtime, with pinned revisions and SHA-256 verification. The model supports 33 languages, including Korean. Files and license texts stay under `%LOCALAPPDATA%\MiniDeck\translation`. Existing apps, key assignments and dial placement are preserved. A working Vulkan GPU is required; initialization failures are shown instead of silently switching to CPU.
+The setup downloads the official **Tencent Hy-MT2 7B Q4_K_M** translation weights (about 4.6GB) and **llama.cpp b11960 Windows Vulkan** runtime, with pinned revisions and SHA-256 verification. The model supports 33 languages, including Korean. Files and license texts stay under `%USERPROFILE%\.minideck\translation`, a shared user location outside redirected AppData caches. Verified downloads from the older AppData location are reused when available. Existing apps, key assignments and dial placement are preserved. A working Vulkan GPU is required; initialization failures are shown instead of silently switching to CPU.
 
 Start MiniDeck, select text and press **key 3**. MiniDeck prepares its installed model in the background at startup. The model sleeps after 15 idle minutes and prepares again on the next request; it occupies GPU memory while loaded. Exiting MiniDeck also stops the server it started. Change the target language under **Local translation settings**; defaults are Korean in the KO edition and English in the EN edition.
 

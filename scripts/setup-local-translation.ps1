@@ -6,11 +6,18 @@ $ErrorActionPreference='Stop'
 if(Get-Process -Name MiniDeck -ErrorAction SilentlyContinue){throw 'Close MiniDeck before running local translation setup.'}
 $ProgressPreference='SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-$installRoot=Join-Path $env:LOCALAPPDATA 'MiniDeck\translation'
+$legacyRoot=Join-Path $env:LOCALAPPDATA 'MiniDeck\translation'
+$installRoot=Join-Path $env:USERPROFILE '.minideck\translation'
 New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
 function Download-Verified([string]$Url,[string]$Name,[string]$Hash) {
  $destination=Join-Path $installRoot $Name
  if((Test-Path -LiteralPath $destination) -and (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -eq $Hash){return $destination}
+ $legacy=Join-Path $legacyRoot $Name
+ if((Test-Path -LiteralPath $legacy) -and (Get-FileHash -LiteralPath $legacy -Algorithm SHA256).Hash -eq $Hash){
+  Copy-Item -LiteralPath $legacy -Destination $destination -Force
+  if((Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $Hash){throw "SHA-256 verification failed after reuse: $Name"}
+  return $destination
+ }
  $partial=$destination+'.partial'
  Write-Output "Downloading $Name" | Out-Host
  Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $partial

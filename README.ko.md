@@ -131,7 +131,7 @@ MiniDeck을 종료한 뒤 압축을 푼 폴더에서 다음 명령을 한 번 �
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-local-translation.ps1
 ```
 
-공식 **Tencent Hy-MT2 7B Q4_K_M** 번역 모델(약 4.6GB)과 **llama.cpp b11960 Windows Vulkan** 실행 파일을 내려받아 SHA-256을 확인합니다. 모델은 한국어를 포함한 33개 언어를 지원합니다. 파일과 라이선스는 `%LOCALAPPDATA%\MiniDeck\translation`에 저장하며 기존 앱 목록·키 지정·다이얼 위치는 유지합니다. Vulkan GPU가 필요하며 GPU 초기화에 실패하면 오류를 표시합니다.
+공식 **Tencent Hy-MT2 7B Q4_K_M** 번역 모델(약 4.6GB)과 **llama.cpp b11960 Windows Vulkan** 실행 파일을 내려받아 SHA-256을 확인합니다. 모델은 한국어를 포함한 33개 언어를 지원합니다. 파일과 라이선스는 AppData 캐시 재지정의 영향을 받지 않는 공통 사용자 폴더 `%USERPROFILE%\.minideck\translation`에 저장합니다. 이전 AppData 폴더의 검증된 다운로드가 있으면 재사용하며 기존 앱 목록·키 지정·다이얼 위치는 유지합니다. Vulkan GPU가 필요하며 GPU 초기화에 실패하면 오류를 표시합니다.
 
 설치 후 MiniDeck을 실행하고 글을 선택해 **3번 키**를 누르세요. 앱을 시작하면 설치된 모델을 뒤에서 미리 준비합니다. 15분 동안 사용하지 않으면 모델이 잠자기 상태로 전환되며 다음 번역 때 다시 준비합니다. 준비된 모델은 이 시간 동안 GPU 메모리를 사용합니다. MiniDeck 종료 시 직접 시작한 서버도 종료합니다. 목표 언어는 **로컬 번역 설정**에서 변경합니다. 기본은 한국어판 한국어, 영문판 영어입니다.
 
