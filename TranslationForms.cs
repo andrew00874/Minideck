@@ -148,6 +148,7 @@ namespace MiniDeck {
    Theme.Apply(this);SetBusy(false);copy.Enabled=false;retry.Enabled=false;
   }
   static void ConfigureText(TextBox box){box.Multiline=true;box.ReadOnly=true;box.MaxLength=1024*1024;box.ScrollBars=ScrollBars.Vertical;box.WordWrap=true;box.TabStop=true;box.ShortcutsEnabled=true;}
+  static string DisplayText(string text){return (text??"").Replace("\r\n","\n").Replace("\r","\n").Replace("\n","\r\n");}
   void SetStatus(string text,bool error){status.Text=text;status.ForeColor=error?Color.FromArgb(255,166,166):Theme.Muted;}
   sealed class WindowProgress:IProgress<string> {
    readonly Action<string> report;public WindowProgress(Action<string> action){report=action;}
@@ -174,7 +175,7 @@ namespace MiniDeck {
    // Preview callbacks and the final continuation must share the UI queue.
    if(!(SynchronizationContext.Current is WindowsFormsSynchronizationContext))SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
    CancelActive();int request=version;
-   completed=false;selectedText=text;lastSettings=(settings??new LocalTranslationSettings()).Clone();source.Text=text??"";result.Clear();
+   completed=false;selectedText=text;lastSettings=(settings??new LocalTranslationSettings()).Clone();source.Text=DisplayText(text);result.Clear();
    if(!Visible){
     Rectangle area=Screen.FromPoint(Cursor.Position).WorkingArea;Point cursor=Cursor.Position;
     Location=new Point(Math.Max(area.Left,Math.Min(cursor.X+20,area.Right-Width)),Math.Max(area.Top,Math.Min(cursor.Y+20,area.Bottom-Height)));
@@ -189,10 +190,10 @@ namespace MiniDeck {
   async void RunTranslation(string text,LocalTranslationSettings settings,int request,CancellationTokenSource cancellation){
    try{
     var progress=new WindowProgress(value=>QueueUpdate(request,()=>SetStatus(value,false)));
-    var preview=new WindowProgress(value=>QueueUpdate(request,()=>{result.Text=value;}));
+    var preview=new WindowProgress(value=>QueueUpdate(request,()=>{result.Text=DisplayText(value);}));
     string translated=await LocalTranslationClient.TranslateAsync(settings,text,cancellation.Token,progress,preview);
     if(IsDisposed||request!=version||cancellation.IsCancellationRequested)return;
-    result.Text=translated;completed=true;SetStatus(L10n.T("번역 완료 · Esc로 닫기"),false);
+    result.Text=DisplayText(translated);completed=true;SetStatus(L10n.T("번역 완료 · Esc로 닫기"),false);
    }catch(OperationCanceledException){if(!IsDisposed&&request==version)SetStatus(L10n.T("번역을 취소했습니다."),false);}
    catch(Exception ex){if(!IsDisposed&&request==version){result.Clear();SetStatus(ex.Message,true);}}
    finally{

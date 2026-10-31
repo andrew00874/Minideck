@@ -93,6 +93,13 @@ namespace MiniDeck {
    }
   }
   public static void Preview(string folder){
+   using(var server=new Server(new[]{"{\"message\":{\"content\":\"first\\ninside\"}}","{\"message\":{\"content\":\"second\"}}"}))
+   using(var form=new TranslationResultForm(delegate{})){
+    form.BeginTranslation("one\n\ntwo",Settings(server.Address,"Ollama"));
+    PumpUntil(()=>!form.IsTranslating,5000,"multiline result did not complete");
+    Check(form.SourceText=="one\r\n\r\ntwo"&&form.ResultText=="first\r\ninside\r\n\r\nsecond","Windows text controls lost source/result paragraph breaks");
+    form.Close();
+   }
    string root=Path.Combine(folder,"preview-installation");Directory.CreateDirectory(root);
    var installed=new LocalModelRuntime.Installation{Executable=Path.Combine(root,"llama-server.exe"),ModelPath=Path.Combine(root,"fixture.gguf"),ApiKeyFile=Path.Combine(root,"key.txt"),ModelId="Hy-MT2-7B",BaseUrl="http://127.0.0.1:17865"};
    File.WriteAllText(installed.Executable,"fixture");File.WriteAllText(installed.ModelPath,"fixture");File.WriteAllText(installed.ApiKeyFile,new string('a',64));
