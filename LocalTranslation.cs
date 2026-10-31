@@ -15,7 +15,7 @@ namespace MiniDeck {
   public string BaseUrl {get;set;}
   public string Model {get;set;}
   public string TargetLanguage {get;set;}
-  public LocalTranslationSettings(){Enabled=true;Provider="Ollama";BaseUrl="http://127.0.0.1:11434";Model="";TargetLanguage=L10n.English?"en":"ko";LocalModelRuntime.ApplyInstalledDefault(this);}
+  public LocalTranslationSettings(){Enabled=true;Provider="MiniDeck";BaseUrl="http://127.0.0.1:17865";Model="";TargetLanguage=L10n.English?"en":"ko";LocalModelRuntime.ApplyInstalledDefault(this);}
   public LocalTranslationSettings Clone(){return new LocalTranslationSettings{Enabled=Enabled,Provider=Provider,BaseUrl=BaseUrl,Model=Model,TargetLanguage=TargetLanguage};}
  }
 
@@ -26,7 +26,7 @@ namespace MiniDeck {
   const int RequestTimeoutMilliseconds=120000;
   public static void Validate(LocalTranslationSettings settings,bool requireModel=true){
    if(settings==null)throw new ArgumentException(L10n.T("로컬 번역 설정을 확인해 주세요."));
-   if(settings.Provider!="Ollama"&&settings.Provider!="OpenAI")throw new ArgumentException(L10n.T("Ollama 또는 LM Studio 연결을 선택하세요."));
+   if(settings.Provider!="MiniDeck"&&settings.Provider!="Ollama"&&settings.Provider!="OpenAI")throw new ArgumentException(L10n.T("번역 엔진을 선택하세요."));
    Uri endpoint;
    IPAddress address;
    if(!Uri.TryCreate(settings.BaseUrl,UriKind.Absolute,out endpoint)||
@@ -68,28 +68,47 @@ namespace MiniDeck {
   }
   public static async Task<string> TranslateAsync(LocalTranslationSettings settings,string text,CancellationToken token,IProgress<string> progress=null,IProgress<string> preview=null){
    if(settings!=null)settings=settings.Clone();
+   if(settings!=null)LocalModelRuntime.Resolve(settings);
    Validate(settings);
    if(String.IsNullOrWhiteSpace(text))throw new ArgumentException(L10n.T("먼저 글을 선택해 주세요."));
    if(text.Length>TextActions.MaxSelectionLength)throw new ArgumentException(L10n.T("선택한 글이 너무 깁니다. 더 짧은 영역을 선택해 주세요."));
    token.ThrowIfCancellationRequested();
-   await LocalModelRuntime.EnsureRunningAsync(settings,token).ConfigureAwait(false);
    List<string> parts=SplitText(text);var translated=new StringBuilder();int count=0,total=0;
    foreach(string part in parts)if(!String.IsNullOrWhiteSpace(part))total++;
    foreach(string part in parts){
     token.ThrowIfCancellationRequested();
     if(String.IsNullOrWhiteSpace(part)){translated.Append(part);continue;}
-    if(progress!=null)progress.Report(String.Format(L10n.T("번역 중… {0}/{1}"),++count,total));
+    count++;
     int start=0,end=part.Length;
     while(start<end&&Char.IsWhiteSpace(part[start]))start++;
     while(end>start&&Char.IsWhiteSpace(part[end-1]))end--;
     translated.Append(part.Substring(0,start));
     string prefix=translated.ToString();
     Action<string> update=preview==null?(Action<string>)null:value=>preview.Report(prefix+value.TrimStart());
-    translated.Append(await TranslatePartAsync(settings,part.Substring(start,end-start),token,update).ConfigureAwait(false));
+    translated.Append(await WithRuntimeAsync(settings,async delegate{
+     if(progress!=null)progress.Report(String.Format(L10n.T("번역 중… {0}/{1}"),count,total));
+     return await TranslatePartAsync(settings,part.Substring(start,end-start),token,update).ConfigureAwait(false);
+    },token,progress,()=>{if(preview!=null)preview.Report(prefix);}).ConfigureAwait(false));
     translated.Append(part.Substring(end));
     if(preview!=null)preview.Report(translated.ToString());
    }
    token.ThrowIfCancellationRequested();return translated.ToString();
+  }
+  static async Task<T> WithRuntimeAsync<T>(LocalTranslationSettings settings,Func<Task<T>> action,CancellationToken token,IProgress<string> progress=null,Action reset=null){
+   bool managed=LocalModelRuntime.IsManaged(settings);
+   for(int attempt=0;;attempt++){
+    token.ThrowIfCancellationRequested();
+    try{
+     await LocalModelRuntime.EnsureRunningAsync(settings,token,progress).ConfigureAwait(false);
+     return await action().ConfigureAwait(false);
+    }catch(LocalTranslationUnavailableException){
+     token.ThrowIfCancellationRequested();if(!managed)throw;
+     if(attempt>=1)throw new InvalidOperationException(L10n.T("내장 번역 엔진을 복구하지 못했습니다. 다시 번역을 눌러 주세요."));
+     if(reset!=null)reset();
+     if(progress!=null)progress.Report(L10n.T("내장 번역 엔진을 다시 연결하는 중… 자동으로 재시도합니다."));
+    }
+    await Task.Delay(300,token).ConfigureAwait(false);
+   }
   }
   static async Task<string> TranslatePartAsync(LocalTranslationSettings settings,string text,CancellationToken token,Action<string> preview){
    var messages=new[]{
@@ -128,9 +147,9 @@ namespace MiniDeck {
   internal static InvalidOperationException IncompleteTranslation(){return new InvalidOperationException(L10n.T("모델의 번역이 중간에 끝났습니다. 더 짧은 글로 다시 시도해 주세요."));}
   public static async Task<List<string>> ListModelsAsync(LocalTranslationSettings settings,CancellationToken token){
    if(settings!=null)settings=settings.Clone();
+   if(settings!=null)LocalModelRuntime.Resolve(settings);
    Validate(settings,false);
-   await LocalModelRuntime.EnsureRunningAsync(settings,token).ConfigureAwait(false);
-   string response=await RequestAsync(settings,settings.Provider=="Ollama"?"api/tags":"v1/models",null,token).ConfigureAwait(false);
+   string response=await WithRuntimeAsync(settings,()=>RequestAsync(settings,settings.Provider=="Ollama"?"api/tags":"v1/models",null,token),token).ConfigureAwait(false);
    Dictionary<string,object> root=Parse(response);object value;
    object[] models=root.TryGetValue(settings.Provider=="Ollama"?"models":"data",out value)?value as object[]:null;
    if(models==null)throw InvalidResponse();
@@ -154,6 +173,7 @@ namespace MiniDeck {
   static string StringAt(Dictionary<string,object> source,string key){object value;return source!=null&&source.TryGetValue(key,out value)?value as string:null;}
   static InvalidOperationException InvalidResponse(){return new InvalidOperationException(L10n.T("로컬 서버의 응답을 읽을 수 없습니다. 서버 종류와 주소를 확인하세요."));}
   static Exception HttpError(int status){
+   if(status==503)return new LocalTranslationUnavailableException(L10n.T("번역 엔진을 준비하는 중입니다."));
    if(status==404)return new InvalidOperationException(L10n.T("모델 또는 API를 찾지 못했습니다. 서버 종류와 설치된 모델 이름을 확인하세요."));
    return new InvalidOperationException(L10n.T("로컬 서버가 요청을 처리하지 못했습니다. 서버 상태와 모델 설정을 확인하세요.")+" (HTTP "+status+")");
   }
@@ -188,6 +208,7 @@ namespace MiniDeck {
          if(bytes.Length+count>MaxResponseBytes)throw InvalidResponse();
          bytes.Write(buffer,0,count);
         }
+        if(response.ContentLength>=0&&bytes.Length!=response.ContentLength)throw new LocalTranslationUnavailableException(L10n.T("로컬 서버와의 연결이 끊겼습니다. 서버 상태를 확인하고 다시 시도하세요."));
         timeout.Token.ThrowIfCancellationRequested();
         try{return new UTF8Encoding(false,true).GetString(bytes.ToArray());}catch(DecoderFallbackException){throw InvalidResponse();}
        }
@@ -196,18 +217,18 @@ namespace MiniDeck {
       token.ThrowIfCancellationRequested();
       if(timeout.IsCancellationRequested)throw new TimeoutException(L10n.T("번역 응답이 늦어 중단했습니다. 모델을 준비한 뒤 다시 시도하세요."));
       using(var response=ex.Response as HttpWebResponse){if(response!=null)throw HttpError((int)response.StatusCode);}
-      throw new InvalidOperationException(L10n.T("로컬 서버에 연결하지 못했습니다. Ollama 또는 LM Studio 서버를 실행하고 주소와 포트를 확인하세요."));
+      throw new LocalTranslationUnavailableException(L10n.T("로컬 서버에 연결하지 못했습니다. Ollama 또는 LM Studio 서버를 실행하고 주소와 포트를 확인하세요."));
      }catch(OperationCanceledException){
       token.ThrowIfCancellationRequested();
       throw new TimeoutException(L10n.T("번역 응답이 늦어 중단했습니다. 모델을 준비한 뒤 다시 시도하세요."));
      }catch(ObjectDisposedException){
       token.ThrowIfCancellationRequested();
       if(timeout.IsCancellationRequested)throw new TimeoutException(L10n.T("번역 응답이 늦어 중단했습니다. 모델을 준비한 뒤 다시 시도하세요."));
-      throw new InvalidOperationException(L10n.T("로컬 서버와의 연결이 끊겼습니다. 서버 상태를 확인하고 다시 시도하세요."));
+      throw new LocalTranslationUnavailableException(L10n.T("로컬 서버와의 연결이 끊겼습니다. 서버 상태를 확인하고 다시 시도하세요."));
      }catch(IOException){
       token.ThrowIfCancellationRequested();
       if(timeout.IsCancellationRequested)throw new TimeoutException(L10n.T("번역 응답이 늦어 중단했습니다. 모델을 준비한 뒤 다시 시도하세요."));
-      throw new InvalidOperationException(L10n.T("로컬 서버와의 연결이 끊겼습니다. 서버 상태를 확인하고 다시 시도하세요."));
+      throw new LocalTranslationUnavailableException(L10n.T("로컬 서버와의 연결이 끊겼습니다. 서버 상태를 확인하고 다시 시도하세요."));
      }
     }
    }

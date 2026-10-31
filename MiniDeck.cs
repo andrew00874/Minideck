@@ -431,7 +431,7 @@ namespace MiniDeck {
   public async void PrepareLocalModel(){
    if(!data.LocalTranslation.Enabled)return;
    var request=new System.Threading.CancellationTokenSource();modelWarmup=request;
-   try{await LocalModelRuntime.EnsureRunningAsync(data.LocalTranslation,request.Token);}
+   try{await LocalModelRuntime.SuperviseAsync(data.LocalTranslation,request.Token);}
    catch(OperationCanceledException){}
    catch(Exception error){AppDiagnostics.Exception("model-warmup",error);}
    finally{if(modelWarmup==request)modelWarmup=null;request.Dispose();}
@@ -443,6 +443,7 @@ namespace MiniDeck {
     IWin32Window owner=translationResult!=null&&!translationResult.IsDisposed&&translationResult.Visible?(IWin32Window)translationResult:(Visible?(IWin32Window)this:null);
     if(form.ShowDialog(owner)!=DialogResult.OK)return;
     data.LocalTranslation=form.Result;Save();UpdateModeButtons();
+    if(modelWarmup!=null)modelWarmup.Cancel();PrepareLocalModel();
     if(translationResult!=null&&!translationResult.IsDisposed&&translationResult.HasSelection){
      if(data.LocalTranslation.Enabled)translationResult.RetryWithSettings(data.LocalTranslation);
      else translationResult.Close();
@@ -564,7 +565,7 @@ namespace MiniDeck {
    if(legacy.Engines==null||legacy.Engines.Count!=5)throw new Exception("Legacy settings migration failed");
    if(legacy.LocalTranslation==null||!legacy.LocalTranslation.Enabled)throw new Exception("Local translation settings migration failed");
    LocalTranslationSettings savedTranslation=data.LocalTranslation;
-   data.LocalTranslation=new LocalTranslationSettings{Model=""}; // Empty model fails locally; no server is contacted.
+   data.LocalTranslation=new LocalTranslationSettings{Provider="Ollama",BaseUrl="http://127.0.0.1:11434",Model=""}; // Empty custom model fails locally; no installed engine is contacted.
    mode=DialMode.Text;ShowCapturedText("private local selection");Application.DoEvents();
    if(overlay.Visible||translationResult==null||!translationResult.Visible||!translationResult.HasSelection)throw new Exception("Key 3 did not route directly to the local result window");
    if(new JavaScriptSerializer().Serialize(data).Contains("private local selection"))throw new Exception("Local translation source persisted in settings");
@@ -625,6 +626,12 @@ namespace MiniDeck {
  }
  static class Program {
   [STAThread] static void Main(string[] args) {
+   if(args.Length==3&&args[0]=="--runtime-test"){
+    Directory.CreateDirectory(args[1]);
+    try{LocalModelRuntimeTests.Run(args[1],args[2]);}
+    catch(Exception error){File.WriteAllText(Path.Combine(args[1],"runtime-tests.txt"),error.ToString());Environment.ExitCode=1;}
+    return;
+   }
    // Network tests run without Windows UI/fonts, installed models or external services.
    if(args.Length==2&&args[0]=="--translation-test"){
     Directory.CreateDirectory(args[1]);
@@ -645,7 +652,7 @@ namespace MiniDeck {
    Native.SetProcessDPIAware();Typography.Initialize();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
    if(args.Length==2&&args[0]=="--translation-ui-test"){
     Directory.CreateDirectory(args[1]);
-    try{LocalTranslationTests.RunUi();File.WriteAllText(Path.Combine(args[1],"translation-ui-tests.txt"),"PASS: translation result lifecycle tests");}
+    try{LocalTranslationTests.RunUi();LocalTranslationTests.Preview(args[1]);File.WriteAllText(Path.Combine(args[1],"translation-ui-tests.txt"),"PASS: translation result lifecycle tests");}
     catch(Exception ex){File.WriteAllText(Path.Combine(args[1],"translation-ui-tests.txt"),ex.ToString());Environment.ExitCode=1;}
     return;
    }

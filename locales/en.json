@@ -206,5 +206,17 @@
   "번역 모델을 시작하지 못했습니다. GPU와 로컬 서버 포트를 확인하세요.": "Could not start the translation model. Check your GPU and local server port.",
   "번역 모델을 준비하는 데 시간이 오래 걸립니다. 잠시 후 다시 시도해 주세요.": "The translation model is taking too long to start. Try again shortly.",
   "결과를 표시하지 못했습니다. 다시 번역을 눌러 주세요.": "Could not display the translation. Choose Translate again to retry.",
-  "화면 처리 중 오류가 발생했습니다. 글을 다시 선택하고 3번 키를 눌러 주세요.": "A display error occurred. Select the text again and press key 3."
+  "화면 처리 중 오류가 발생했습니다. 글을 다시 선택하고 3번 키를 눌러 주세요.": "A display error occurred. Select the text again and press key 3.",
+  "번역 엔진": "Translation engine",
+  "번역 엔진을 선택하세요.": "Select a translation engine.",
+  "MiniDeck 내장 번역": "MiniDeck built-in translation",
+  "엔진 확인": "Check engine",
+  "MiniDeck이 번역 엔진을 자동으로 시작하고 복구합니다.\n별도 프로그램을 실행하거나 서버 주소를 입력할 필요가 없습니다.": "MiniDeck starts and recovers the translation engine automatically.\nYou do not need to run another app or enter a server address.",
+  "내장 번역 모델을 먼저 설치해 주세요. 설치 후 MiniDeck이 자동으로 관리합니다.": "Install the built-in translation model first. MiniDeck will then manage it automatically.",
+  "내장 번역 엔진을 준비하는 중… 자동으로 시작합니다.": "Preparing the built-in translation engine… Starting automatically.",
+  "내장 번역 엔진을 다시 연결하는 중… 자동으로 재시도합니다.": "Reconnecting the built-in translation engine… Retrying automatically.",
+  "내장 번역 엔진을 준비하지 못했습니다. 다시 번역을 눌러 주세요.": "Could not prepare the built-in translation engine. Choose Translate again to retry.",
+  "내장 번역 엔진을 복구하지 못했습니다. 다시 번역을 눌러 주세요.": "Could not recover the built-in translation engine. Choose Translate again to retry.",
+  "내장 번역 엔진이 준비됐습니다.": "The built-in translation engine is ready.",
+  "번역 엔진을 준비하는 중입니다.": "The translation engine is preparing."
 }

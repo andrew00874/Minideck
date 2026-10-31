@@ -46,7 +46,7 @@ foreach($license in @(@{Repository='tencent/Hy-MT2-7B-GGUF';Path='LICENSE.txt';N
 $settingsFile=Join-Path $env:APPDATA 'MiniDeck\settings.json'
 if(Test-Path -LiteralPath $settingsFile) {
  $settings=Get-Content -LiteralPath $settingsFile -Raw -Encoding UTF8 | ConvertFrom-Json
- $local=@{Enabled=$true;Provider='OpenAI';BaseUrl=$baseUrl;Model=$modelId}
+ $local=@{Enabled=$true;Provider='MiniDeck';BaseUrl=$baseUrl;Model=$modelId}
  if($settings.PSObject.Properties['LocalTranslation'] -and $settings.LocalTranslation.TargetLanguage){$local.TargetLanguage=$settings.LocalTranslation.TargetLanguage}
  $settings | Add-Member -NotePropertyName LocalTranslation -NotePropertyValue $local -Force
  Copy-Item -LiteralPath $settingsFile -Destination ($settingsFile+'.pre-local-translation-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'.bak')

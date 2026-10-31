@@ -92,6 +92,28 @@ namespace MiniDeck {
     form.Close();
    }
   }
+  public static void Preview(string folder){
+   string root=Path.Combine(folder,"preview-installation");Directory.CreateDirectory(root);
+   var installed=new LocalModelRuntime.Installation{Executable=Path.Combine(root,"llama-server.exe"),ModelPath=Path.Combine(root,"fixture.gguf"),ApiKeyFile=Path.Combine(root,"key.txt"),ModelId="Hy-MT2-7B",BaseUrl="http://127.0.0.1:17865"};
+   File.WriteAllText(installed.Executable,"fixture");File.WriteAllText(installed.ModelPath,"fixture");File.WriteAllText(installed.ApiKeyFile,new string('a',64));
+   File.WriteAllText(Path.Combine(root,"runtime.json"),new JavaScriptSerializer().Serialize(installed));
+   LocalModelRuntime.TestRoot=root;
+   try{
+    using(var settings=new TranslationSettingsForm(new LocalTranslationSettings{Provider="MiniDeck"}))SavePreview(settings,Path.Combine(folder,"translation-settings.png"));
+    using(var settings=new TranslationSettingsForm(new LocalTranslationSettings{Provider="OpenAI",BaseUrl="http://127.0.0.1:1234",Model="example-model"}))SavePreview(settings,Path.Combine(folder,"translation-settings-external.png"));
+   }finally{LocalModelRuntime.TestRoot=null;}
+   using(var server=new Server(200,"{\"message\":{\"content\":\"번역문을 더 큰 글씨로 표시합니다.\\nThe translation is now easier to read.\"}}"))
+   using(var result=new TranslationResultForm(delegate{})){
+    result.BeginTranslation("The translation is now easier to read.\n번역문을 더 큰 글씨로 표시합니다.",Settings(server.Address,"Ollama"));
+    PumpUntil(()=>!result.IsTranslating,5000,"preview translation did not complete");
+    SavePreview(result,Path.Combine(folder,"translation-result.png"));
+   }
+  }
+  static void SavePreview(Form form,string file){
+   form.Show();Application.DoEvents();
+   using(var bitmap=new System.Drawing.Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new System.Drawing.Rectangle(System.Drawing.Point.Empty,form.Size));bitmap.Save(file);}
+   form.Close();
+  }
   static void PumpUntil(Func<bool> condition,int milliseconds,string failure){
    Stopwatch timer=Stopwatch.StartNew();
    while(!condition()&&timer.ElapsedMilliseconds<milliseconds){Application.DoEvents();Thread.Sleep(10);}

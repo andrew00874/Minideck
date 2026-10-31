@@ -58,7 +58,7 @@ namespace MiniDeck {
     }
     if(!finished){decoder.GetChars(new byte[0],0,0,characters,0,true);if(line.Length>0)consume(line.ToString());if(!ollama&&data.Length>0)payload(data.ToString());}
    }catch(DecoderFallbackException){throw Invalid();}
-   token.ThrowIfCancellationRequested();if(!finished)throw LocalTranslationClient.IncompleteTranslation();
+   token.ThrowIfCancellationRequested();if(!finished)throw new LocalTranslationUnavailableException(L10n.T("로컬 서버와의 연결이 끊겼습니다. 서버 상태를 확인하고 다시 시도하세요."));
    update(text.ToString());
    object result=ollama?(object)new Dictionary<string,object>{{"message",new Dictionary<string,object>{{"content",text.ToString()}}},{"done",true},{"done_reason","stop"}}:
     new Dictionary<string,object>{{"choices",new[]{new Dictionary<string,object>{{"message",new Dictionary<string,object>{{"content",text.ToString()}}},{"finish_reason","stop"}}}}};

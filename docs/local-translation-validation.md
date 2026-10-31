@@ -33,4 +33,16 @@ MiniDeck now prepares its installed model during normal startup (not test/previe
 
 The stability follow-up uses the result window's UI queue and full text snapshots instead of native append/selection operations. A display-update exception cancels that result while keeping the launcher running. Normal UI errors are also recorded and recover the result window rather than exiting the launcher. App and model lifecycle events are recorded in a bounded local `diagnostics/events.jsonl` file; exception messages, selected text, translations, process-output lines and credentials are excluded. Native errors are reduced to fixed categories such as GPU memory/device loss or model loading. Error-injection and privacy tests cover these boundaries. The original reported crash was not reproduced and its exact cause remains unconfirmed.
 
-Development packages are versioned 0.3.0-beta.3 and include `scripts/setup-local-translation.ps1`. The existing 0.2.0-beta.1 release downloads remain unchanged. Model weights are downloaded separately into local application data and are not included in the application ZIP.
+Development packages are versioned 0.3.0-beta.4 and include `scripts/setup-local-translation.ps1`. The existing 0.2.0-beta.1 release downloads remain unchanged. Model weights are downloaded separately into local application data and are not included in the application ZIP.
+
+## Managed engine recovery and readable text
+
+The installed engine has an explicit MiniDeck provider. Requests resolve its model and endpoint from the validated installation manifest; an old saved port or model does not silently select an external connection. Legacy OpenAI-compatible settings pointing to the installed endpoint are recognized automatically. Custom Ollama and LM Studio settings keep their existing behavior.
+
+MiniDeck monitors its owned process without readiness polling that would wake a sleeping model. Background recovery permits at most three preparation attempts per five minutes. A failed connection, HTTP 503, or interrupted stream retries the current translation chunk once, after clearing its partial preview. Cancellation and configuration errors do not trigger a retry, and repeated failure remains a visible engine-recovery error. Model output limits still reject incomplete results.
+
+The separate runtime fixture tests stopped-engine startup, stale saved settings, legacy migration, concurrent preparation, a process exit during streaming, clearing partial output, one-retry limits, configuration errors, cancellation, background recovery and its restart budget, and isolation from custom servers. It uses temporary fake model/key files and a separate fixture executable, without real weights, GPU use, or external services.
+
+A local smoke test with the pinned Hy-MT2 7B Vulkan runtime deliberately killed only its own worker after the first streamed preview. The actual MiniDeck client restarted the worker, reset the preview and completed a 328-character Korean result. The full cold-start/crash/reload/generation exercise took 14.304 seconds; this is recovery evidence, not a normal translation-speed measurement or a reproduction of the original crash.
+
+Source and result text are 14pt, with 12pt translation settings and controls. The windows provide additional space for the larger text. Built-in mode hides server-address controls and displays preparation/recovery feedback. Korean and English UI test runs save rendered translation-window previews for inspection. Physical key-3/editor acceptance remains separate from these checks.

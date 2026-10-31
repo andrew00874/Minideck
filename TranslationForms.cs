@@ -11,37 +11,45 @@ namespace MiniDeck {
   readonly CheckBox enabled=new CheckBox();
   readonly ComboBox provider=new ComboBox(),model=new ComboBox(),language=new ComboBox();
   readonly TextBox address=new TextBox();
-  readonly Label message=new Label();
+  readonly Label message=new Label(),addressLabel=new Label(),modelLabel=new Label(),help=new Label(),languageLabel=new Label();
   readonly Button refresh=new Button(),save=new Button();
+  readonly Button cancel=new Button();
+  readonly LocalTranslationSettings installed;
+  readonly bool installedAvailable;
+  readonly Dictionary<int,string> addresses=new Dictionary<int,string>(),models=new Dictionary<int,string>();
+  int selectedProvider;
   CancellationTokenSource loading;
   public TranslationSettingsForm(LocalTranslationSettings current){
    LocalTranslationSettings settings=(current??new LocalTranslationSettings()).Clone();
-   Text=L10n.T("로컬 번역 설정");Icon=Brand.Icon;Font=Typography.Create(10);
-   ClientSize=new Size(660,550);StartPosition=FormStartPosition.CenterParent;
+   installed=settings.Clone();installedAvailable=LocalModelRuntime.ApplyInstalledDefault(installed);
+   Text=L10n.T("로컬 번역 설정");Icon=Brand.Icon;Font=Typography.Create(12);AutoScaleMode=AutoScaleMode.None;
+   ClientSize=new Size(760,650);StartPosition=FormStartPosition.CenterParent;
    FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;MinimizeBox=false;
-   enabled.Text=L10n.T("3번 키로 바로 로컬 번역");enabled.SetBounds(24,22,610,30);enabled.Checked=settings.Enabled;
+   enabled.Text=L10n.T("3번 키로 바로 로컬 번역");enabled.SetBounds(24,22,712,34);enabled.Checked=settings.Enabled;
    Controls.Add(enabled);
-   Controls.Add(new Label{Text=L10n.T("체크를 끄면 기존 검색·번역 다이얼을 사용합니다."),Left=24,Top=60,Width=610,Height=26});
-   AddLabel(L10n.T("모델 실행 프로그램"),100);
-   provider.SetBounds(24,128,610,30);provider.DropDownStyle=ComboBoxStyle.DropDownList;provider.AccessibleName=L10n.T("모델 실행 프로그램");
-   provider.Items.AddRange(new object[]{"Ollama","OpenAI API (LM Studio / llama.cpp)"});Controls.Add(provider);
-   AddLabel(L10n.T("로컬 서버 주소"),174);
-   address.SetBounds(24,202,610,28);address.Text=settings.BaseUrl;address.AccessibleName=L10n.T("로컬 서버 주소");Controls.Add(address);
-   AddLabel(L10n.T("모델 이름"),246);
-   model.SetBounds(24,274,428,30);model.DropDownStyle=ComboBoxStyle.DropDown;model.Text=settings.Model;model.AccessibleName=L10n.T("모델 이름");Controls.Add(model);
-   refresh.Text=L10n.T("모델 불러오기");refresh.SetBounds(464,271,170,34);Controls.Add(refresh);
-   AddLabel(L10n.T("번역 언어 (ko / en / ja ...)"),322);
-   language.SetBounds(24,350,180,30);language.DropDownStyle=ComboBoxStyle.DropDown;language.AccessibleName=L10n.T("번역 언어 (ko / en / ja ...)");
+   Controls.Add(new Label{Text=L10n.T("체크를 끄면 기존 검색·번역 다이얼을 사용합니다."),Left=24,Top=64,Width=712,Height=30});
+   AddLabel(L10n.T("번역 엔진"),110);
+   provider.SetBounds(24,138,712,34);provider.DropDownStyle=ComboBoxStyle.DropDownList;provider.AccessibleName=L10n.T("번역 엔진");
+   provider.Items.AddRange(new object[]{L10n.T("MiniDeck 내장 번역"),"Ollama","LM Studio / llama.cpp"});Controls.Add(provider);
+   addressLabel.Text=L10n.T("로컬 서버 주소");addressLabel.SetBounds(24,190,712,28);
+   address.SetBounds(24,218,712,32);address.AccessibleName=L10n.T("로컬 서버 주소");
+   modelLabel.Text=L10n.T("모델 이름");modelLabel.SetBounds(24,266,712,28);
+   model.SetBounds(24,294,498,34);model.DropDownStyle=ComboBoxStyle.DropDown;model.AccessibleName=L10n.T("모델 이름");
+   refresh.SetBounds(534,291,202,42);
+   languageLabel.Text=L10n.T("번역 언어 (ko / en / ja ...)");languageLabel.SetBounds(24,428,712,28);
+   language.SetBounds(24,456,220,34);language.DropDownStyle=ComboBoxStyle.DropDown;language.AccessibleName=languageLabel.Text;
    language.Items.AddRange(new object[]{"ko","en","ja","zh","fr","de","es"});language.Text=settings.TargetLanguage;Controls.Add(language);
-   Controls.Add(new Label{Text=L10n.T("Ollama 또는 LM Studio에서 서버를 실행하고 설치된 모델을 선택하세요.\n서버 주소는 이 PC의 localhost 또는 루프백 IP만 사용할 수 있습니다."),Left=24,Top=396,Width=610,Height=48});
-   message.SetBounds(24,448,610,44);Controls.Add(message);
-   save.Text=L10n.T("저장");save.SetBounds(424,502,100,36);
-   Button cancel=new Button{Text=L10n.T("취소"),Left=534,Top=502,Width=100,Height=36,DialogResult=DialogResult.Cancel};
-   Controls.AddRange(new Control[]{save,cancel});AcceptButton=save;CancelButton=cancel;
-   provider.SelectedIndex=settings.Provider=="OpenAI"?1:0;
+   help.SetBounds(24,350,712,66);message.SetBounds(24,506,712,58);
+   save.Text=L10n.T("저장");save.SetBounds(504,578,110,44);
+   cancel.Text=L10n.T("취소");cancel.SetBounds(626,578,110,44);cancel.DialogResult=DialogResult.Cancel;
+   Controls.AddRange(new Control[]{addressLabel,address,modelLabel,model,refresh,help,languageLabel,message,save,cancel});AcceptButton=save;CancelButton=cancel;
+   bool managed=settings.Provider=="MiniDeck"||(installedAvailable&&settings.Provider=="OpenAI"&&String.Equals((settings.BaseUrl??"").TrimEnd('/'),installed.BaseUrl.TrimEnd('/'),StringComparison.OrdinalIgnoreCase));
+   selectedProvider=managed?0:settings.Provider=="OpenAI"?2:1;
+   if(selectedProvider>0){addresses[selectedProvider]=settings.BaseUrl;models[selectedProvider]=settings.Model;}
+   provider.SelectedIndex=selectedProvider;UpdateEngineView();
    provider.SelectedIndexChanged+=delegate{
-    if(String.IsNullOrWhiteSpace(address.Text)||address.Text=="http://127.0.0.1:11434"||address.Text=="http://127.0.0.1:1234")address.Text=provider.SelectedIndex==1?"http://127.0.0.1:1234":"http://127.0.0.1:11434";
-    model.Items.Clear();model.Text="";message.Text="";
+    if(selectedProvider>0){addresses[selectedProvider]=address.Text;models[selectedProvider]=model.Text;}
+    selectedProvider=provider.SelectedIndex;model.Items.Clear();message.Text="";UpdateEngineView();
    };
    refresh.Click+=async delegate{await LoadModels();};
    save.Click+=delegate{
@@ -50,25 +58,46 @@ namespace MiniDeck {
    };
    Theme.Apply(this);
   }
-  void AddLabel(string text,int top){Controls.Add(new Label{Text=text,Left=24,Top=top,Width=610,Height=24});}
-  LocalTranslationSettings ReadSettings(){return new LocalTranslationSettings{Enabled=enabled.Checked,Provider=provider.SelectedIndex==1?"OpenAI":"Ollama",BaseUrl=address.Text.Trim(),Model=model.Text.Trim(),TargetLanguage=language.Text.Trim()};}
+  void AddLabel(string text,int top){Controls.Add(new Label{Text=text,Left=24,Top=top,Width=712,Height=28});}
+  void UpdateEngineView(){
+   bool managed=provider.SelectedIndex==0;int offset=managed?76:0;
+   addressLabel.Visible=address.Visible=!managed;
+   modelLabel.Top=266-offset;model.Top=294-offset;refresh.Top=291-offset;
+   help.Top=350-offset;languageLabel.Top=428-offset;language.Top=456-offset;message.Top=506-offset;
+   save.Top=cancel.Top=578-offset;ClientSize=new Size(760,650-offset);
+   refresh.Text=managed?L10n.T("엔진 확인"):L10n.T("모델 불러오기");refresh.AccessibleName=refresh.Text;
+   string value;
+   address.Text=managed?(installedAvailable?installed.BaseUrl:""):(addresses.TryGetValue(selectedProvider,out value)?value:selectedProvider==1?"http://127.0.0.1:11434":"http://127.0.0.1:1234");
+   model.Text=managed?(installedAvailable?installed.Model:""):(models.TryGetValue(selectedProvider,out value)?value:"");
+   help.Text=managed?(installedAvailable?L10n.T("MiniDeck이 번역 엔진을 자동으로 시작하고 복구합니다.\n별도 프로그램을 실행하거나 서버 주소를 입력할 필요가 없습니다."):L10n.T("내장 번역 모델을 먼저 설치해 주세요. 설치 후 MiniDeck이 자동으로 관리합니다.")):
+    L10n.T("Ollama 또는 LM Studio에서 서버를 실행하고 설치된 모델을 선택하세요.\n서버 주소는 이 PC의 localhost 또는 루프백 IP만 사용할 수 있습니다.");
+   model.Enabled=!managed&&loading==null;address.Enabled=!managed&&loading==null;
+  }
+  LocalTranslationSettings ReadSettings(){
+   var next=new LocalTranslationSettings{Enabled=enabled.Checked,Provider=provider.SelectedIndex==0?"MiniDeck":provider.SelectedIndex==2?"OpenAI":"Ollama",BaseUrl=address.Text.Trim(),Model=model.Text.Trim(),TargetLanguage=language.Text.Trim()};
+   if(provider.SelectedIndex==0&&!LocalModelRuntime.ApplyInstalledDefault(next)){
+    if(next.Enabled)throw new InvalidOperationException(L10n.T("번역 모델 설치 파일을 찾지 못했습니다. 로컬 번역 설치를 다시 실행하세요."));
+    next.BaseUrl="http://127.0.0.1:17865";next.Model="";
+   }
+   return next;
+  }
   void ShowMessage(string text,bool error){message.Text=text;message.ForeColor=error?Color.FromArgb(255,166,166):Theme.Muted;}
   async Task LoadModels(){
    CancellationTokenSource request=new CancellationTokenSource();loading=request;
    refresh.Enabled=false;save.Enabled=false;provider.Enabled=false;address.Enabled=false;model.Enabled=false;
-   ShowMessage(L10n.T("로컬 모델 목록을 불러오는 중…"),false);
+   ShowMessage(provider.SelectedIndex==0?L10n.T("내장 번역 엔진을 준비하는 중… 자동으로 시작합니다."):L10n.T("로컬 모델 목록을 불러오는 중…"),false);
    try{
     LocalTranslationSettings settings=ReadSettings();LocalTranslationClient.Validate(settings,false);
     List<string> found=await LocalTranslationClient.ListModelsAsync(settings,request.Token);
     if(IsDisposed||request.IsCancellationRequested)return;
     string selected=model.Text;model.Items.Clear();foreach(string item in found)model.Items.Add(item);
     model.Text=selected;if(String.IsNullOrWhiteSpace(selected)&&found.Count>0)model.SelectedIndex=0;
-    ShowMessage(found.Count==0?L10n.T("설치된 모델이 없습니다. 모델 실행 프로그램에서 먼저 모델을 내려받으세요."):String.Format(L10n.T("사용 가능한 모델 {0}개를 찾았습니다."),found.Count),found.Count==0);
+    ShowMessage(found.Count==0?L10n.T("설치된 모델이 없습니다. 모델 실행 프로그램에서 먼저 모델을 내려받으세요."):provider.SelectedIndex==0?L10n.T("내장 번역 엔진이 준비됐습니다."):String.Format(L10n.T("사용 가능한 모델 {0}개를 찾았습니다."),found.Count),found.Count==0);
    }catch(OperationCanceledException){}
    catch(Exception ex){if(!IsDisposed&&!request.IsCancellationRequested)ShowMessage(ex.Message,true);}
    finally{
     if(loading==request)loading=null;request.Dispose();
-    if(!IsDisposed){refresh.Enabled=true;save.Enabled=true;provider.Enabled=true;address.Enabled=true;model.Enabled=true;}
+    if(!IsDisposed){refresh.Enabled=true;save.Enabled=true;provider.Enabled=true;address.Enabled=provider.SelectedIndex!=0;model.Enabled=provider.SelectedIndex!=0;}
    }
   }
   protected override void OnFormClosing(FormClosingEventArgs e){if(loading!=null)loading.Cancel();base.OnFormClosing(e);}
@@ -91,18 +120,18 @@ namespace MiniDeck {
   internal string StatusText {get{return status.Text;}}
   internal bool CanCopy {get{return copy.Enabled;}}
   public TranslationResultForm(Action settingsAction){
-   openSettings=settingsAction;Text=L10n.T("MiniDeck · 로컬 번역");Icon=Brand.Icon;Font=Typography.Create(10);
-   ClientSize=new Size(650,500);MinimumSize=new Size(666,539);StartPosition=FormStartPosition.Manual;
-   status.SetBounds(22,18,606,48);status.Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right;Controls.Add(status);
-   Controls.Add(new Label{Text=L10n.T("선택한 글"),Left=22,Top=76,Width=606,Height=24});
-   ConfigureText(source);source.AccessibleName=L10n.T("선택한 글");source.SetBounds(22,102,606,106);source.Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right;Controls.Add(source);
-   Controls.Add(new Label{Text=L10n.T("번역 결과"),Left=22,Top=222,Width=606,Height=24});
-   ConfigureText(result);result.AccessibleName=L10n.T("번역 결과");result.SetBounds(22,248,606,184);result.Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Left|AnchorStyles.Right;Controls.Add(result);
-   copy.Text=L10n.T("결과 복사");copy.SetBounds(22,450,100,36);
-   retry.Text=L10n.T("다시 번역");retry.SetBounds(132,450,100,36);
-   stop.Text=L10n.T("취소");stop.SetBounds(242,450,86,36);
-   Button settings=new Button{Text=L10n.T("로컬 번역 설정"),Left=338,Top=450,Width=160,Height=36};
-   Button close=new Button{Text=L10n.T("닫기"),Left=508,Top=450,Width=120,Height=36};
+   openSettings=settingsAction;Text=L10n.T("MiniDeck · 로컬 번역");Icon=Brand.Icon;Font=Typography.Create(12);AutoScaleMode=AutoScaleMode.None;
+   ClientSize=new Size(780,600);MinimumSize=new Size(796,639);StartPosition=FormStartPosition.Manual;
+   status.SetBounds(24,18,732,60);status.Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right;Controls.Add(status);
+   Controls.Add(new Label{Text=L10n.T("선택한 글"),Left=24,Top=90,Width=732,Height=28});
+   ConfigureText(source);source.Font=Typography.Create(14);source.AccessibleName=L10n.T("선택한 글");source.SetBounds(24,122,732,120);source.Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right;Controls.Add(source);
+   Controls.Add(new Label{Text=L10n.T("번역 결과"),Left=24,Top=258,Width=732,Height=28});
+   ConfigureText(result);result.Font=Typography.Create(14);result.AccessibleName=L10n.T("번역 결과");result.SetBounds(24,290,732,234);result.Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Left|AnchorStyles.Right;Controls.Add(result);
+   copy.Text=L10n.T("결과 복사");copy.SetBounds(24,542,122,44);
+   retry.Text=L10n.T("다시 번역");retry.SetBounds(156,542,140,44);
+   stop.Text=L10n.T("취소");stop.SetBounds(306,542,86,44);
+   Button settings=new Button{Text=L10n.T("로컬 번역 설정"),Left=402,Top=542,Width=204,Height=44};
+   Button close=new Button{Text=L10n.T("닫기"),Left=616,Top=542,Width=140,Height=44};
    foreach(Button button in new[]{copy,retry,stop,settings,close}){button.Anchor=AnchorStyles.Bottom|AnchorStyles.Left;Controls.Add(button);}
    close.Anchor=AnchorStyles.Bottom|AnchorStyles.Right;
    close.Click+=delegate{Close();};
