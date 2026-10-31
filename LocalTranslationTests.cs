@@ -104,7 +104,7 @@ namespace MiniDeck {
    }finally{LocalModelRuntime.TestRoot=null;}
    using(var server=new Server(200,"{\"message\":{\"content\":\"번역문을 더 큰 글씨로 표시합니다.\\nThe translation is now easier to read.\"}}"))
    using(var result=new TranslationResultForm(delegate{})){
-    result.BeginTranslation("The translation is now easier to read.\n번역문을 더 큰 글씨로 표시합니다.",Settings(server.Address,"Ollama"));
+    result.BeginTranslation("The translation is now easier to read. 번역문을 더 큰 글씨로 표시합니다.",Settings(server.Address,"Ollama"));
     PumpUntil(()=>!result.IsTranslating,5000,"preview translation did not complete");
     SavePreview(result,Path.Combine(folder,"translation-result.png"));
    }
