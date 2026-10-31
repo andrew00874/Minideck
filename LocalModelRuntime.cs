@@ -29,7 +29,10 @@ namespace MiniDeck {
   static Process owned;
   static bool stopping;
   internal static string TestRoot;
-  static string Root {get{return TestRoot??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"MiniDeck","translation");}}
+  // AppData writes from a packaged launcher can be redirected to its private
+  // cache. Keep the installer and independently launched MiniDeck on one path.
+  internal static string SharedRoot {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),".minideck");}}
+  static string Root {get{return TestRoot??Path.Combine(SharedRoot,"translation");}}
   static bool WithinRoot(string path){return !String.IsNullOrWhiteSpace(path)&&Path.GetFullPath(path).StartsWith(Path.GetFullPath(Root)+Path.DirectorySeparatorChar,StringComparison.OrdinalIgnoreCase);}
   static Installation ReadManifest(){
    string file=Path.Combine(Root,"runtime.json");

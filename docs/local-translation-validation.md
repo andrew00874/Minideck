@@ -33,9 +33,11 @@ MiniDeck now prepares its installed model during normal startup (not test/previe
 
 The stability follow-up uses the result window's UI queue and full text snapshots instead of native append/selection operations. A display-update exception cancels that result while keeping the launcher running. Normal UI errors are also recorded and recover the result window rather than exiting the launcher. App and model lifecycle events are recorded in a bounded local `diagnostics/events.jsonl` file; exception messages, selected text, translations, process-output lines and credentials are excluded. Native errors are reduced to fixed categories such as GPU memory/device loss or model loading. Error-injection and privacy tests cover these boundaries. The original reported crash was not reproduced and its exact cause remains unconfirmed.
 
-Development packages are versioned 0.3.0-beta.4 and include `scripts/setup-local-translation.ps1`. The existing 0.2.0-beta.1 release downloads remain unchanged. Model weights are downloaded separately into local application data and are not included in the application ZIP.
+Development packages are versioned 0.3.0-beta.5 and include `scripts/setup-local-translation.ps1`. The existing 0.2.0-beta.1 release downloads remain unchanged. Model weights are downloaded separately into `%USERPROFILE%\.minideck\translation` and are not included in the application ZIP.
 
 ## Managed engine recovery and readable text
+
+During normal-launch verification, file handles opened through the setup environment's apparent `%LOCALAPPDATA%\MiniDeck` path resolved into the Codex package's private `LocalCache\Local\MiniDeck` directory. The separately launched MiniDeck did not see the ready runtime recorded by the setup/test environment. Engine files and metadata-only diagnostics now use `%USERPROFILE%\.minideck`, outside redirected AppData, so both launch contexts use the same physical location. Existing app/key settings retain their current location.
 
 The installed engine has an explicit MiniDeck provider. Requests resolve its model and endpoint from the validated installation manifest; an old saved port or model does not silently select an external connection. Legacy OpenAI-compatible settings pointing to the installed endpoint are recognized automatically. Custom Ollama and LM Studio settings keep their existing behavior.
 

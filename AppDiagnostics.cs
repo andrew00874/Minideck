@@ -8,7 +8,7 @@ namespace MiniDeck {
  static class AppDiagnostics {
   static readonly object sync=new object();
   internal static Action<string> TestSink;
-  static string Folder {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"MiniDeck","diagnostics");}}
+  static string Folder {get{return Path.Combine(LocalModelRuntime.SharedRoot,"diagnostics");}}
   // Exception messages and process output can contain selected text. Only log
   // structural exception/runtime metadata, never messages, prompts or tokens.
   public static void Exception(string component,Exception error){

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Store the installed engine and structural diagnostics under `%USERPROFILE%\.minideck` so setup launched through a packaged app and MiniDeck launched separately share one location. Reuse checksum-verified downloads from the previous AppData location when available.
 - Manage the installed translator as a built-in engine, resolve stale saved endpoints from its installation, recover owned process exits in the background, and retry interrupted translation chunks once while clearing partial output. Custom Ollama/LM Studio servers remain user-managed. Bound background restarts and preserve cancellation and private-text boundaries.
 - Enlarge translation text from 10pt to 14pt and translation controls/settings to 12pt. Normalize display line endings for Windows text controls so source/result paragraphs stay visible. Hide server-address controls for the built-in engine and show preparation/recovery status instead of asking users to run a server.
 - Marshal streamed text updates through the result window, replace text snapshots without native append/selection operations, and contain display errors without exiting the launcher. Add bounded structural app/model lifecycle diagnostics that exclude exception messages, model output, selected text and credentials.
